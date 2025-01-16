@@ -29,3 +29,15 @@
 
 en:
   hello: "Hello world"
+
+  jwt:
+    decode_error: Invalid token
+
+  errors:
+    route_not_found: Route not found
+    internal_error: Something went wrong, please try again later
+    unauthorized: Unauthorized
+    forbidden: Forbidden
+    record_not_found: Record not found
+    parameter_missing: Parameter missing
+

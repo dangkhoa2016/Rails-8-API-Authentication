@@ -1,3 +1,4 @@
+require_relative "../lib/exception_middleware"
 require_relative "boot"
 require "rails/all"
 require "dotenv/load" if Rails.env.development? || Rails.env.test?
@@ -28,5 +29,6 @@ module Rails8ApiAuthentication
     # Middleware like session, flash, cookies can be added back manually.
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
+    config.middleware.use ::ExceptionMiddleware
   end
 end
