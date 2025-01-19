@@ -40,4 +40,10 @@ en:
     forbidden: Forbidden
     record_not_found: Record not found
     parameter_missing: Parameter missing
+    not_found: "%{model} not found"
+    must_be_adminstrator: You must be an administrator to perform this action
 
+  user:
+    deleted: User [%{email}] with id [%{id}] has been deleted
+    signed_out: "Your account: %{email} has been signed out successfully"
+    not_signed_in: No user is signed in

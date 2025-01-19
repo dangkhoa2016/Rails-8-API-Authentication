@@ -1,26 +1,29 @@
 # 1 - Sign Up
 curl -X POST -H "Content-Type: application/json" -d '{
   "user": {
-    "email": "user1@example.com",
+    "email": "user@example.com",
     "password": "password",
     "password_confirmation": "password"
   }
 }' "http://localhost:4000/users" | jq .
-# http://localhost:4000/users/confirmation?confirmation_token=MjRUbw87mVdKk8jCRH8h
 {
-  "id": 2,
-  "email": "user@example.com",
-  "username": "",
-  "first_name": "",
-  "last_name": "",
-  "avatar": null,
-  "role": "user",
-  "created_at": "2025-01-16T17:32:30.315Z",
-  "updated_at": "2025-01-16T17:32:30.315Z"
+  "message": "A message with a confirmation link has been sent to your email address. Please follow the link to activate your account.",
+  "user": {
+    "id": 2,
+    "email": "user@example.com",
+    "username": "",
+    "first_name": "",
+    "last_name": "",
+    "avatar": null,
+    "role": "user",
+    "created_at": "2025-01-19T13:27:43.182Z",
+    "updated_at": "2025-01-19T13:27:43.182Z"
+  }
 }
+# http://localhost:4000/users/confirmation?confirmation_token=MjRUbw87mVdKk8jCRH8h
 
 
-# 2 - Sign In
+# 2 - Sign In without 'user' root key
 curl -X POST -H "Content-Type: application/json" -d '{
   "email": "user@example.com",
   "password": "password"
