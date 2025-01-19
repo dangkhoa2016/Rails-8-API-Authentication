@@ -21,9 +21,9 @@ class Users::SessionsController < Devise::SessionsController
     user = current_user if user_signed_in?
     if user
       sign_out(user)
-      render json: { message: "Your account: #{user&.email} has been signed out successfully." }, status: :ok
+      render json: { message: I18n.translate("user.signed_out", email: user.email) }, status: :ok
     else
-      render json: { message: "No user is signed in." }, status: :unprocessable_entity
+      render json: { message: I18n.translate("user.not_signed_in") }, status: :unprocessable_entity
     end
   end
 

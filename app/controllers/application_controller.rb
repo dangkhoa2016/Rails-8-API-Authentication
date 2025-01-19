@@ -1,12 +1,15 @@
 class ApplicationController < ActionController::API
   include ActionController::MimeResponds
   respond_to :json
+  before_action :configure_permitted_parameters, if: :devise_controller?
 
   # Catch all types of errors and display messages to the user
   rescue_from StandardError, with: :handle_internal_error
   rescue_from ActiveRecord::RecordNotFound, with: :record_not_found
   rescue_from ActionController::ParameterMissing, with: :parameter_missing
   # rescue_from ActionController::RoutingError, with: :route_not_found
+  rescue_from ActionController::UnknownFormat, with: :route_not_found
+  rescue_from Exception, with: :handle_internal_error
 
   def decode_token(token_string)
     begin
@@ -27,6 +30,13 @@ class ApplicationController < ActionController::API
   end
 
   private
+
+  def configure_permitted_parameters
+    fields = [ :first_name, :last_name, :username, :email, :password, :password_confirmation ]
+    devise_parameter_sanitizer.permit(:sign_up, keys: fields)
+    devise_parameter_sanitizer.permit(:account_update, keys: fields)
+    # devise_parameter_sanitizer.permit(:account_update, keys: fields + [:current_password])
+  end
 
    # Handle internal errors
    def handle_internal_error(exception)

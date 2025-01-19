@@ -10,9 +10,18 @@ class Users::RegistrationsController < Devise::RegistrationsController
   # end
 
   # POST /resource
-  # def create
-  #   super
-  # end
+  def create
+    super do |resource|
+      if resource.errors.empty?
+        return render json: {
+          message: find_message(:signed_up_but_unconfirmed, default: "A message with a confirmation link has been sent to your email address. Please follow the link to activate your account."),
+          user: resource
+        }, status: :ok
+      else
+        return render json: { errors: resource.errors.full_messages }, status: :unprocessable_entity
+      end
+    end
+  end
 
   # GET /resource/edit
   # def edit
@@ -20,14 +29,32 @@ class Users::RegistrationsController < Devise::RegistrationsController
   # end
 
   # PUT /resource
-  # def update
-  #   super
-  # end
+  def update
+    super do |resource|
+      if resource.errors.empty?
+        return render json: {
+          message: find_message(:updated, default: "Your account has been updated successfully."),
+          user: resource
+        }, status: :ok
+      else
+        return render json: { errors: resource.errors.full_messages }, status: :unprocessable_entity
+      end
+    end
+  end
 
   # DELETE /resource
-  # def destroy
-  #   super
-  # end
+  def destroy
+    super do |resource|
+      if resource.errors.empty?
+        return render json: {
+          message: find_message(:destroyed, default: "Bye! Your account has been successfully cancelled. We hope to see you again soon."),
+          user: resource
+        }, status: :ok
+      else
+        return render json: { errors: resource.errors.full_messages }, status: :unprocessable_entity
+      end
+    end
+  end
 
   # GET /resource/cancel
   # Forces the session data which is usually expired after sign

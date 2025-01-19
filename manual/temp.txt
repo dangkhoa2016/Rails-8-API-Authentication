@@ -4,7 +4,7 @@ config/credentials.yml.enc is encrypted with the master key
 
 
 rails generate devise User
-rails generate controller Home index
+rails generate controller User index
 
 ----
 

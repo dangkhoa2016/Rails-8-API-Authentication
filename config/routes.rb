@@ -3,13 +3,21 @@ Rails.application.routes.draw do
   resources :home, only: [ :index ]
 
   devise_for :users, defaults: { format: :json }, controllers: {
-    sessions: "users/sessions"
+    sessions: "users/sessions",
+    registrations: "users/registrations",
+    passwords: "users/passwords"
   }
 
   devise_scope :user do
     get "user/profile" => "users/sessions#show"
     get "user/me" => "users/sessions#show"
     get "user/whoami" => "users/sessions#show"
+  end
+
+  resources :users, only: [ :index, :update, :destroy, :show ], constraints: { id: /\d+/ }, defaults: { format: :json } do
+    collection do
+      post "create" => "users#create"
+    end
   end
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
