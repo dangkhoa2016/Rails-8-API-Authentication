@@ -6,6 +6,15 @@
 #
 one: 
   email: 'user1@example.local'
+  username: 'user1'
+  first_name: 'User'
 
 two:
   email: 'user2@example.local'
+
+admin:
+  email: 'admin@local.test'
+  username: 'admin_user'
+  role: 'admin'
+  confirmed_at: <%= Time.now %>
+  encrypted_password: <%= Devise::Encryptor.digest(User, 'password') %>
