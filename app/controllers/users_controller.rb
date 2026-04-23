@@ -52,8 +52,6 @@ class UsersController < ApplicationController
     else
       @user = User.find_by_email!(params[:email])
     end
-  rescue ActiveRecord::RecordNotFound
-    render json: { errors: I18n.t("errors.not_found", model: User.model_name.human) }, status: :not_found
   end
 
   def user_params
