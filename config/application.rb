@@ -28,5 +28,8 @@ module Rails8ApiAuthentication
     # Middleware like session, flash, cookies can be added back manually.
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
+
+    # Rack::Attack is not auto-loaded in API-only mode; mount it explicitly.
+    config.middleware.use Rack::Attack
   end
 end

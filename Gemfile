@@ -50,3 +50,6 @@ end
 gem "devise", "~> 4.9"
 
 gem "devise-jwt", "~> 0.12.1"
+
+# Rate limiting for auth endpoints
+gem "rack-attack"
