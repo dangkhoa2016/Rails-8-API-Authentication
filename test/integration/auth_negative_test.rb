@@ -24,6 +24,7 @@ class AuthNegativeTest < ActionDispatch::IntegrationTest
   test "unconfirmed user cannot sign in" do
     user = User.create!(
       email: "pending@example.local",
+      username: "pending_user",
       password: "password",
       password_confirmation: "password"
     )

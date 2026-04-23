@@ -7,6 +7,8 @@ class User < ApplicationRecord
          :rememberable, :validatable, :recoverable,
          :jwt_authenticatable, jwt_revocation_strategy: JwtDenylist
 
+  validates :username, uniqueness: true, allow_blank: true
+
   attr_accessor :token_info
   enum :role, { user: "user", admin: "admin" }
 
@@ -28,6 +30,6 @@ class User < ApplicationRecord
   def send_confirmation_instructions
     super
   rescue StandardError => e
-    puts "Error sending confirmation instructions: #{e}"
+    Rails.logger.error "Error sending confirmation instructions: #{e}"
   end
 end
