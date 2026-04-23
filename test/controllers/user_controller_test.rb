@@ -3,31 +3,36 @@ require "test_helper"
 class UserControllerTest < ActionDispatch::IntegrationTest
   setup do
     @user = users(:admin)
-
-    @token, @payload = Warden::JWTAuth::UserEncoder.new.call(@user, :user, nil)
-    @headers = { "Authorization": "Bearer #{@token}" }
+    sign_in @user
 
     @user_test = users(:one)
   end
 
   test "should get index" do
-    get users_url, headers: @headers, as: :json
+    get users_url, as: :json
     assert_response :success
   end
 
   test "should create user" do
     assert_difference("User.count") do
-      post users_url, params: {
+      post users_create_url, params: {
         user: {
         email: "new@user.local",
         username: "new_user",
         password: "password" }
-      }, headers: @headers, as: :json
+      }, as: :json
     end
   end
 
+  test "should return parameter missing when creating user without payload" do
+    post users_create_url, params: {}, as: :json
+
+    assert_response :unprocessable_entity
+    assert_equal({ "error" => "Parameter missing" }, JSON.parse(@response.body))
+  end
+
   test "should show user" do
-    get user_url(@user_test), headers: @headers, as: :json
+    get user_url(@user_test), as: :json
     assert_response :success
     assert_equal @user_test.email, "user1@example.local"
     assert_equal @user_test.username, "user1"
@@ -43,7 +48,7 @@ class UserControllerTest < ActionDispatch::IntegrationTest
         first_name: "User 1",
         role: "admin"
       }
-    }, headers: @headers, as: :json
+    }, as: :json
 
     assert_response :success
     @user_test.reload
@@ -56,13 +61,13 @@ class UserControllerTest < ActionDispatch::IntegrationTest
 
   test "should destroy user" do
     assert_difference("User.count", -1) do
-      delete user_url(@user_test), headers: @headers, as: :json
+      delete user_url(@user_test), as: :json
     end
   end
 
   test "should destroy current logged in user" do
     assert_difference("User.count", -1) do
-      delete user_url(@user), headers: @headers, as: :json
+      delete user_url(@user), as: :json
     end
   end
 end

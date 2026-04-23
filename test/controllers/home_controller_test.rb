@@ -6,6 +6,13 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "should return json for route not found" do
+    get "/not-a-real-route", as: :json
+
+    assert_response :not_found
+    assert_equal({ "error" => "Route not found" }, JSON.parse(@response.body))
+  end
+
   test "should get favicon.ico" do
     get "/favicon.ico"
     assert_response :success

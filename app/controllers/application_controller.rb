@@ -9,7 +9,6 @@ class ApplicationController < ActionController::API
   rescue_from ActionController::ParameterMissing, with: :parameter_missing
   # rescue_from ActionController::RoutingError, with: :route_not_found
   rescue_from ActionController::UnknownFormat, with: :route_not_found
-  rescue_from Exception, with: :handle_internal_error
 
   def decode_token(token_string)
     begin
@@ -41,7 +40,7 @@ class ApplicationController < ActionController::API
    # Handle internal errors
    def handle_internal_error(exception)
     logger.error "Internal error: #{exception.message}", exception.backtrace.join("\n")
-    render json: { error: I18n.translate("errors.internal_found") }, status: 500
+    render json: { error: I18n.translate("errors.internal_error") }, status: 500
   end
 
   # Handle record not found errors
@@ -52,6 +51,7 @@ class ApplicationController < ActionController::API
 
   # Handle parameter missing errors
   def parameter_missing(exception)
-    render json: { error: I18n.translate("errors.parameter_mifound") }, status: :unprocessable_entity
+    logger.error "Parameter missing: #{exception.message}"
+    render json: { error: I18n.translate("errors.parameter_missing") }, status: :unprocessable_entity
   end
 end

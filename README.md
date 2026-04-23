@@ -1,205 +1,188 @@
 
 
-# Rails v8 API Authentication with JWT
+# Rails 8 API Authentication with JWT
 
-This is a simple Rails v8 API server with JWT-based authentication. The server handles user registration, login, profile updates, and user management with role-based access.
-
+This project is a Rails 8 API authentication service built with Devise and JWT. It supports registration, email confirmation, sign in, sign out, profile lookup, and user-management operations with admin-only access controls.
 
 ## Features
 
-- **User Registration:**
-  - Fields: `email`, `password`, `username`
-  - Validation: `email` and `username` are unique, `password` is required.
+- User registration with email confirmation.
+- JWT-based sign in and sign out.
+- Profile lookup with token metadata.
+- Self-service account update and account deletion.
+- Admin-only user listing, user creation, role updates, and user deletion.
+- Basic CI with Brakeman, RuboCop, and Rails tests.
 
-- **User Login:**
-  - Fields: `username`, `password`
-  - Returns a JWT token upon successful login.
+## Stack
 
-- **User Logout:**
-  - Invalidates the JWT token on the client side.
+- Rails 8
+- Devise
+- devise-jwt
+- SQLite
+- Docker + Kamal deployment scaffolding
 
-- **Get User Info:**
-  - Retrieves information for the logged-in user.
-  - Admins can also view information for other users.
+## Quick Start
 
-- **Update User Info (Basic):**
-  - Allows a user to update their profile information (e.g., email, username).
+1. Install dependencies and prepare the database.
 
-- **Update User Role (Admin Only):**
-  - Admins can update the `role` of a user (e.g., admin, regular user).
-
-- **Delete User (Self-Delete):**
-  - A user can delete their own account.
-
-- **Delete User (Admin Only):**
-  - Admins can delete any user.
-
-
-## Technologies Used
-
-- **Ruby on Rails v8**: Web framework.
-- **SQLite/PostgreSQL**: Database (SQLite used in the example).
-- **devise**: Flexible authentication solution for Rails with Warden.
-- **devise JWT**: ForJWT token authentication with devise and rails.
-
-## Setup
-
-### 1. Install Rails
-
-If you don’t have Rails 8 installed yet, run:
 ```bash
-gem install rails -v 8
+bin/setup
 ```
 
-## Installation
+2. Start the application.
 
-1. Clone the repository:
-    ```bash
-    git clone <repository-url>
-    cd <repository-folder>
-    ```
+```bash
+bin/dev
+```
 
-2. Install dependencies:
-    ```bash
-    bundle install
-    ```
+3. Call the API on `http://localhost:4000`.
 
-3. Create a `.env` file at the root of your project for environment variables:
-    ```env
-    RAILS_LOG_TO_STDOUT=true
-    RAILS_ENV=development
-    PORT=4000
-    RAILS_MAX_THREADS=1
-    PORT=3000
-    ```
+4. Use the scripts in `manual/` as runnable request examples:
 
-## API Endpoints
+- `manual/registration.sh`
+- `manual/session.sh`
+- `manual/user.sh`
 
-### 1. **POST /register**
-- Registers a new user.
-- **Body**:
-    ```json
-    {
+## Environment
+
+The sample environment file currently contains the minimum local settings:
+
+```env
+RAILS_LOG_TO_STDOUT=true
+RAILS_ENV=development
+PORT=4000
+RAILS_MAX_THREADS=1
+```
+
+## Current Route Contract
+
+The route contract below reflects `config/routes.rb` and the current controller implementation.
+
+### Authentication Routes
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| POST | `/users` | Register a new account |
+| POST | `/users/sign_in` | Sign in and receive JWT in the `Authorization` response header |
+| DELETE | `/users/sign_out` | Sign out and revoke the current token |
+| GET | `/users/confirmation` | Confirm email via Devise confirmable flow |
+| PUT/PATCH | `/users` | Update the current signed-in account |
+| DELETE | `/users` | Delete the current signed-in account |
+
+### Profile Routes
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/user/profile` | Primary profile endpoint |
+| GET | `/user/me` | Compatibility alias |
+| GET | `/user/whoami` | Compatibility alias |
+
+### Admin and User Management Routes
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/users` | List users, admin only |
+| POST | `/users/create` | Create a user as admin |
+| GET | `/users/:id` | View a user; admin or self |
+| PUT | `/users/:id` | Update a user; admin or self |
+| DELETE | `/users/:id` | Delete a user; admin or self |
+
+## Request Format Notes
+
+Devise endpoints expect payloads nested under the `user` key.
+
+Example sign-up request:
+
+```json
+{
+  "user": {
+    "email": "user@example.com",
+    "password": "password",
+    "password_confirmation": "password"
+  }
+}
+```
+
+Example sign-in request:
+
+```json
+{
+  "user": {
+    "email": "user@example.com",
+    "password": "password"
+  }
+}
+```
+
+## Example Flow
+
+### 1. Register
+
+```bash
+curl -X POST http://localhost:4000/users \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user": {
       "email": "user@example.com",
-      "password": "password123",
-      "username": "user123"
+      "password": "password",
+      "password_confirmation": "password"
     }
-    ```
-- **Response**:
-    ```json
-    {
-      "message": "User created successfully."
-    }
-    ```
+  }'
+```
 
-### 2. **POST /login**
-- Logs in an existing user and returns a JWT token.
-- **Body**:
-    ```json
-    {
-      "username": "user123",
-      "password": "password123"
-    }
-    ```
-- **Response**:
-    ```json
-    {
-      "token": "<jwt_token>",
-      "message": "Login successful",
-      "user": {
-        "username": "user123",
-        ...
-      }
-    }
-    ```
+### 2. Confirm Email
 
-### 3. **POST /logout**
-- Logs out the user by invalidating their token.
-- **Response**:
-    ```json
-    {
-      "message": "Logout successful."
-    }
-    ```
+Use the confirmation link generated by Devise, for example:
 
-### 4. **GET /user**
-- Retrieves the logged-in user's information.
-- **Headers**:
-    - `Authorization`: `Bearer <jwt_token>`
-- **Response**:
-    ```json
-    {
-      "username": "user123",
+```bash
+curl "http://localhost:4000/users/confirmation?confirmation_token=<token>"
+```
+
+### 3. Sign In
+
+```bash
+curl -i -X POST http://localhost:4000/users/sign_in \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user": {
       "email": "user@example.com",
-      "role": "user"
+      "password": "password"
     }
-    ```
+  }'
+```
 
-### 5. **PUT /user**
-- Updates basic information of the logged-in user (email or username).
-- **Headers**:
-    - `Authorization`: `Bearer <jwt_token>`
-- **Body**:
-    ```json
-    {
-      "email": "new_email@example.com",
-      "username": "new_username"
-    }
-    ```
-- **Response**:
-    ```json
-    {
-      "message": "User information updated successfully."
-    }
-    ```
+The JWT is returned in the `Authorization` response header.
 
-### 6. **DELETE /user**
-- Deletes the logged-in user account.
-- **Headers**:
-    - `Authorization`: `Bearer <jwt_token>`
-- **Response**:
-    ```json
-    {
-      "message": "Bye! Your account has been successfully cancelled. We hope to see you again soon."
-    }
-    ```
+### 4. Read Profile
 
-### 7. **DELETE /user/2**
-- Deletes a user account (only accessible by admin).
-- **Headers**:
-    - `Authorization`: `Bearer <jwt_token>`
-- **Body**:
-    ```json
-    {
-    }
-    ```
-- **Response**:
-    ```json
-    {
-      "message": "User deleted successfully."
-    }
-    ```
+```bash
+curl http://localhost:4000/user/profile \
+  -H "Authorization: Bearer <jwt_token>"
+```
 
-## Example Usage
+### 5. Sign Out
 
-1. Register a user:
-    ```bash
-    curl -X POST http://localhost:4000/users/register -H "Content-Type: application/json" -d '{"email": "user@example.com", "password": "password123", "username": "user123"}'
-    ```
+```bash
+curl -X DELETE http://localhost:4000/users/sign_out \
+  -H "Authorization: Bearer <jwt_token>"
+```
 
-2. Log in to get the JWT token:
-    ```bash
-    curl -X POST http://localhost:4000/users/login -H "Content-Type: application/json" -d '{"username": "user123", "password": "password123"}'
-    ```
+## Manual References
 
-3. Get user information:
-    ```bash
-    curl -X GET http://localhost:4000/user/me -H "Authorization: Bearer <jwt_token>"
-    ```
+The scripts below currently reflect the implementation more accurately than the original README examples:
 
-for more information, please check the [registration.sh](./manual/registration.sh), [session.sh](./manual/session.sh) and [user.sh](./manual/user.sh) file.
+- [manual/registration.sh](./manual/registration.sh)
+- [manual/session.sh](./manual/session.sh)
+- [manual/user.sh](./manual/user.sh)
+
+## Improvement Planning
+
+Project improvement artifacts are tracked in:
+
+- [manual/PROJECT_IMPROVEMENT_REPORT.md](./manual/PROJECT_IMPROVEMENT_REPORT.md)
+- [manual/IMPLEMENTATION_TRACKER.md](./manual/IMPLEMENTATION_TRACKER.md)
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 

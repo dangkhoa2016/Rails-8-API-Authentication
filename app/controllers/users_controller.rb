@@ -1,5 +1,7 @@
 class UsersController < ApplicationController
-  before_action :authorize_request
+  include UserAccessControl
+
+  before_action :authorize_user_access
   before_action :find_user, only: %i[show update destroy]
 
   # GET /users
@@ -43,22 +45,6 @@ class UsersController < ApplicationController
   end
 
   private
-
-  def authorize_request
-    if current_user.blank?
-      return render json: { errors: I18n.t("errors.unauthorized") }, status: :unauthorized
-    end
-
-    if action_name.in?(%w[update destroy show])
-      if current_user.id.to_s == params[:id].to_s
-        return
-      end
-    end
-
-    unless current_user.admin?
-      render json: { errors: I18n.t("errors.must_be_adminstrator") }, status: :unauthorized
-    end
-  end
 
   def find_user
     if params[:id]
