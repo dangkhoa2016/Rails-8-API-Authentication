@@ -60,6 +60,7 @@ class ActionDispatch::IntegrationTest
   end
 
   def confirmed_user(email, password: "password", **attributes)
+    attributes[:username] ||= email.split("@").first.gsub(/[^\w]/, "_") + "_#{SecureRandom.hex(4)}"
     User.create!(
       {
         email: email,

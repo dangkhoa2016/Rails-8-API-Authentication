@@ -21,7 +21,11 @@ def get_email
 end
 
 def get_password
-  return 'adminadmin' if Rails.env.development?
+  if Rails.env.development?
+    password = SecureRandom.hex(16)
+    Rails.logger.info "[seeds] Generated dev admin password: #{password}"
+    return password
+  end
 
   if ENV['ADMIN_PASSWORD'].present?
     puts "Loaded admin password from environment variables"

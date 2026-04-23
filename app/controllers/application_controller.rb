@@ -38,8 +38,8 @@ class ApplicationController < ActionController::API
     # devise_parameter_sanitizer.permit(:account_update, keys: fields + [:current_password])
   end
 
-   # Handle internal errors
-   def handle_internal_error(exception)
+  # Handle internal errors
+  def handle_internal_error(exception)
     logger.error "Internal error: #{exception.message}\n#{Array(exception.backtrace).join("\n")}"
     render json: { error: I18n.translate("errors.internal_error") }, status: 500
   end
