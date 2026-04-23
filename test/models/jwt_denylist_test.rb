@@ -20,4 +20,21 @@ class JwtDenylistTest < ActiveSupport::TestCase
   test "find one" do
     assert_equal "123", jwt_denylists(:two).jti
   end
+
+  test "delete_expired! removes only records older than cutoff" do
+    JwtDenylist.delete_all
+
+    cutoff = Time.current.change(usec: 0)
+
+    expired = JwtDenylist.create!(jti: "expired-jti", exp: cutoff - 1.second)
+    boundary = JwtDenylist.create!(jti: "boundary-jti", exp: cutoff)
+    active = JwtDenylist.create!(jti: "active-jti", exp: cutoff + 1.hour)
+
+    removed = JwtDenylist.delete_expired!(before: cutoff)
+
+    assert_equal 1, removed
+    assert_not JwtDenylist.exists?(expired.id)
+    assert JwtDenylist.exists?(boundary.id)
+    assert JwtDenylist.exists?(active.id)
+  end
 end
