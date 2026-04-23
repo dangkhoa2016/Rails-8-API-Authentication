@@ -5,7 +5,7 @@ class AuthNegativeTest < ActionDispatch::IntegrationTest
     get "/users", as: :json
 
     assert_response :unauthorized
-    assert_equal({ "errors" => "Unauthorized" }, json_response)
+    assert_equal({ "error" => "Unauthorized" }, json_response)
   end
 
   test "non admin user cannot access users index" do
@@ -16,7 +16,7 @@ class AuthNegativeTest < ActionDispatch::IntegrationTest
 
     assert_response :unauthorized
     assert_equal(
-      { "errors" => "You must be an administrator to perform this action" },
+      { "error" => "You must be an administrator to perform this action" },
       json_response
     )
   end
