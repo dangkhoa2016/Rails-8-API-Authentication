@@ -70,4 +70,53 @@ class UserControllerTest < ActionDispatch::IntegrationTest
       delete user_url(@user), as: :json
     end
   end
+
+  # --- Non-admin access rejection ---
+
+  test "non-admin cannot access users index" do
+    sign_out @user
+    regular = confirmed_user("regular@example.local", role: "user",
+                             first_name: "Regular", last_name: "User",
+                             confirmed_at: Time.current)
+    sign_in regular
+
+    get users_url, as: :json
+    assert_response :unauthorized
+  end
+
+  test "non-admin cannot destroy another user" do
+    sign_out @user
+    regular = confirmed_user("regular2@example.local", role: "user",
+                             first_name: "Regular", last_name: "User",
+                             confirmed_at: Time.current)
+    sign_in regular
+
+    delete user_url(@user_test), as: :json
+    assert_response :unauthorized
+  end
+
+  # --- Duplicate email registration ---
+
+  test "cannot create user with duplicate email" do
+    post users_create_url, params: {
+      user: { email: "user1@example.local", username: "dup_user", password: "password" }
+    }, as: :json
+    assert_response :unprocessable_entity
+    assert_not_nil json_response["errors"]
+  end
+
+  # --- Password confirmation mismatch ---
+
+  test "cannot create user when password confirmation does not match" do
+    post users_create_url, params: {
+      user: {
+        email: "mismatch@example.local",
+        username: "mismatch_user",
+        password: "password",
+        password_confirmation: "different"
+      }
+    }, as: :json
+    assert_response :unprocessable_entity
+    assert_not_nil json_response["errors"]
+  end
 end
