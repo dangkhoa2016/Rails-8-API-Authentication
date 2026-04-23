@@ -1,6 +1,4 @@
 require "test_helper"
-require "devise/jwt/test_helpers"
-require "securerandom"
 
 class AuthNegativeTest < ActionDispatch::IntegrationTest
   test "unauthenticated user cannot access users index" do
@@ -69,14 +67,9 @@ class AuthNegativeTest < ActionDispatch::IntegrationTest
 
   test "revoked token cannot be reused for profile access" do
     user = confirmed_user("revoked@example.local")
-    headers = Devise::JWT::TestHelpers.auth_headers(json_headers, user)
+    headers = jwt_auth_headers_for(user)
     token = bearer_token_from_headers(headers)
-    payload, = JWT.decode(
-      token,
-      Warden::JWTAuth.config.secret,
-      true,
-      algorithm: Warden::JWTAuth.config.algorithm
-    )
+    payload = decode_jwt(token)
 
     assert_difference("JwtDenylist.count", 1) do
       delete "/users/sign_out", headers: headers, as: :json
@@ -93,50 +86,5 @@ class AuthNegativeTest < ActionDispatch::IntegrationTest
     assert_equal payload.fetch("jti"), body.dig("token_info", "jti")
     assert_equal false, body.dig("token_info", "expired")
     assert JwtDenylist.exists?(jti: payload.fetch("jti"))
-  end
-
-  private
-
-  def confirmed_user(email)
-    User.create!(
-      email: email,
-      password: "password",
-      password_confirmation: "password",
-      confirmed_at: Time.current
-    )
-  end
-
-  def expired_token_for(user)
-    payload = {
-      "sub" => user.id.to_s,
-      "scp" => "user",
-      "aud" => nil,
-      "iat" => 2.hours.ago.to_i,
-      "exp" => 1.hour.ago.to_i,
-      "jti" => SecureRandom.uuid
-    }
-
-    token = JWT.encode(payload, Warden::JWTAuth.config.secret, Warden::JWTAuth.config.algorithm)
-
-    [ token, payload ]
-  end
-
-  def json_headers
-    {
-      "Accept" => "application/json",
-      "Content-Type" => "application/json"
-    }
-  end
-
-  def authorization_headers(token)
-    json_headers.merge("Authorization" => "Bearer #{token}")
-  end
-
-  def bearer_token_from_headers(headers)
-    headers.fetch("Authorization").delete_prefix("Bearer ")
-  end
-
-  def json_response
-    JSON.parse(response.body)
   end
 end
