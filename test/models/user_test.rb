@@ -86,4 +86,53 @@ class UserTest < ActiveSupport::TestCase
     assert_not user.save, "Saved user with duplicate username"
     assert_includes user.errors[:username], "has already been taken"
   end
+
+  test "serializable hash includes unconfirmed email when present" do
+    user = User.new(
+      email: "reconfirm@example.local",
+      username: "reconfirm_user",
+      password: "password",
+      password_confirmation: "password",
+      unconfirmed_email: "pending@example.local"
+    )
+
+    assert_equal "pending@example.local", user.serializable_hash[:unconfirmed_email]
+  end
+
+  test "send confirmation instructions logs and swallows delivery errors" do
+    user = User.create!(
+      email: "delivery-error@example.local",
+      username: "delivery_error_user",
+      password: "password",
+      password_confirmation: "password"
+    )
+
+    logger = Class.new {
+      attr_reader :messages
+
+      def initialize
+        @messages = []
+      end
+
+      def error(message)
+        @messages << message
+        nil
+      end
+    }.new
+
+    user.define_singleton_method(:send_devise_notification) do |*_args|
+      raise StandardError, "mailer exploded"
+    end
+
+    original_logger = Rails.logger
+    Rails.singleton_class.send(:define_method, :logger) { logger }
+
+    begin
+      assert_nil user.send_confirmation_instructions
+    ensure
+      Rails.singleton_class.send(:define_method, :logger) { original_logger }
+    end
+
+    assert_includes logger.messages, "Error sending confirmation instructions: mailer exploded"
+  end
 end

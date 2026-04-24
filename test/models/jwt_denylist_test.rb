@@ -37,4 +37,33 @@ class JwtDenylistTest < ActiveSupport::TestCase
     assert JwtDenylist.exists?(boundary.id)
     assert JwtDenylist.exists?(active.id)
   end
+
+  test "jwt_revoked? returns true when jti exists" do
+    user = User.create!(
+      email: "revoked-jti@example.local",
+      username: "revoked_jti_user",
+      password: "password",
+      password_confirmation: "password",
+      confirmed_at: Time.current
+    )
+    payload = { "jti" => "revoked-jti" }
+    JwtDenylist.create!(jti: payload.fetch("jti"), exp: 1.hour.from_now)
+
+    assert JwtDenylist.jwt_revoked?(payload, user)
+    assert_nil user.token_info
+  end
+
+  test "jwt_revoked? stores payload on user when jti is not revoked" do
+    user = User.create!(
+      email: "active-jti@example.local",
+      username: "active_jti_user",
+      password: "password",
+      password_confirmation: "password",
+      confirmed_at: Time.current
+    )
+    payload = { "jti" => "active-jti", "sub" => user.id.to_s }
+
+    assert_not JwtDenylist.jwt_revoked?(payload, user)
+    assert_equal({ payload: payload }, user.token_info)
+  end
 end
