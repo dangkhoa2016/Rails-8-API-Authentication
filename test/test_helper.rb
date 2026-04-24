@@ -1,5 +1,11 @@
 if ENV["COVERAGE"]
   require "simplecov"
+  require 'simplecov-console'
+  SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter.new([
+    SimpleCov::Formatter::HTMLFormatter,
+    SimpleCov::Formatter::Console,
+  ])
+
   SimpleCov.start "rails" do
     coverage_dir "public/coverage"
     add_filter "/test/"
