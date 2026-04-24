@@ -273,6 +273,15 @@ The files below currently reflect the implementation more accurately than the or
 - [manual/password.sh](./manual/password.sh)
 - [manual/user.sh](./manual/user.sh)
 
+## Additional Documentation
+
+The `docs/` folder contains deeper implementation and operations notes for the current authentication stack:
+
+- [docs/ACCESS_CONTROL.md](./docs/ACCESS_CONTROL.md) - Authorization rules for guest, self-service, and admin flows
+- [docs/JWT_LIFECYCLE.md](./docs/JWT_LIFECYCLE.md) - JWT issuance, profile-token metadata, revocation, and cleanup
+- [docs/RATE_LIMITING.md](./docs/RATE_LIMITING.md) - Current Rack::Attack thresholds, error responses, and proxy considerations
+- [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) - Kamal, Docker, environment variables, health checks, and SQLite persistence
+
 ## Improvement Planning
 
 Project improvement artifacts are tracked in:
