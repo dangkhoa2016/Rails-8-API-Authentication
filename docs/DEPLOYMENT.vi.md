@@ -19,7 +19,7 @@ Mở `config/deploy.yml` và thay thế tất cả placeholder `<...>`:
 
 ```yaml
 # Tên image trên registry
-image: your-dockerhub-username/api_authentication
+image: your-dockerhub-username/rails_8_api_authentication
 
 # IP hoặc hostname của server
 servers:
@@ -95,7 +95,7 @@ Lệnh này sẽ:
 - SSH vào server
 - Cài Docker nếu chưa có
 - Pull image từ registry
-- Tạo volume `api_authentication_storage` cho SQLite
+- Tạo volume `rails_8_api_authentication_storage` cho SQLite
 - Khởi động container + Kamal proxy (Traefik)
 - Xin SSL certificate từ Let's Encrypt
 
@@ -160,7 +160,7 @@ Tham khảo `.env.sample` để biết đầy đủ các biến. Các biến qua
 
 ## SQLite và persistence
 
-Dữ liệu SQLite production được lưu trong Docker volume `api_authentication_storage` → mount vào `/rails/storage` bên trong container. Ứng dụng dùng nhiều file SQLite ở đây: `production.sqlite3`, `production_cache.sqlite3`, `production_queue.sqlite3`, và `production_cable.sqlite3`.
+Dữ liệu SQLite production được lưu trong Docker volume `rails_8_api_authentication_storage` → mount vào `/rails/storage` bên trong container. Ứng dụng dùng nhiều file SQLite ở đây: `production.sqlite3`, `production_cache.sqlite3`, `production_queue.sqlite3`, và `production_cable.sqlite3`.
 
 **Sao lưu:**
 

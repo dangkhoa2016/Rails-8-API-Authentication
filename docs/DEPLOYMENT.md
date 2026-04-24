@@ -19,7 +19,7 @@ Open `config/deploy.yml` and replace all placeholders `<...>`:
 
 ```yaml
 # Image name on the registry
-image: your-dockerhub-username/api_authentication
+image: your-dockerhub-username/rails_8_api_authentication
 
 # Server IP or hostname
 servers:
@@ -96,7 +96,7 @@ This command will:
 * SSH into the server
 * Install Docker if not present
 * Pull the image from the registry
-* Create volume `api_authentication_storage` for SQLite
+* Create volume `rails_8_api_authentication_storage` for SQLite
 * Start the container + Kamal proxy (Traefik)
 * Obtain an SSL certificate from Let's Encrypt
 
@@ -162,7 +162,7 @@ Refer to `.env.sample` for the full list. Key variables for production:
 
 ## SQLite and persistence
 
-Production SQLite data is stored in Docker volume `api_authentication_storage` → mounted at `/rails/storage` inside the container. The app uses multiple SQLite files there: `production.sqlite3`, `production_cache.sqlite3`, `production_queue.sqlite3`, and `production_cable.sqlite3`.
+Production SQLite data is stored in Docker volume `rails_8_api_authentication_storage` → mounted at `/rails/storage` inside the container. The app uses multiple SQLite files there: `production.sqlite3`, `production_cache.sqlite3`, `production_queue.sqlite3`, and `production_cable.sqlite3`.
 
 **Backup:**
 
