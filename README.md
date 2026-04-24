@@ -117,6 +117,18 @@ RAILS_MAX_THREADS=1
 
 If you do not set `PORT`, `bin/dev` boots on `3000` locally.
 
+## Code Coverage
+
+Generate a coverage report locally with SimpleCov by running the test suite with `COVERAGE=1`:
+
+```bash
+COVERAGE=1 bin/rails test
+```
+
+The report is written to `public/coverage`. While the Rails server is running in development, open `http://localhost:3000/coverage` to view the latest generated report. This route is development-only and simply redirects to the static HTML report.
+
+Internally, the app redirects `/coverage` to `/coverage/` before the static file server handles the request. The trailing slash matters because the generated SimpleCov HTML references assets with relative paths such as `./assets/...`.
+
 ## Current Route Contract
 
 The route contract below reflects `config/routes.rb` and the current controller implementation.
