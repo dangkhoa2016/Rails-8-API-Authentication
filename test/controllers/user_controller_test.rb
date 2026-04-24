@@ -6,6 +6,7 @@ class UserControllerTest < ActionDispatch::IntegrationTest
     sign_in @user
 
     @user_test = users(:one)
+    @other_user = users(:two)
   end
 
   test "should get index" do
@@ -40,6 +41,13 @@ class UserControllerTest < ActionDispatch::IntegrationTest
     assert_equal @user_test.role, "user"
   end
 
+  test "should return record not found for missing user" do
+    get user_url(999_999), as: :json
+
+    assert_response :not_found
+    assert_equal({ "error" => "Record not found" }, json_response)
+  end
+
   test "should update user" do
     put user_url(@user_test), params: {
       user: {
@@ -57,6 +65,17 @@ class UserControllerTest < ActionDispatch::IntegrationTest
     assert_equal @user_test.username, "user_1"
     assert_equal @user_test.first_name, "User 1"
     assert_equal @user_test.role, "admin"
+  end
+
+  test "should return validation errors when update is invalid" do
+    put user_url(@user_test), params: {
+      user: {
+        username: @other_user.username
+      }
+    }, as: :json
+
+    assert_response :unprocessable_entity
+    assert_includes json_response.fetch("errors"), "Username has already been taken"
   end
 
   test "should destroy user" do
