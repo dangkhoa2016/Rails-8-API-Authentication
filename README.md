@@ -1,19 +1,22 @@
-
-
 # Rails 8 API Authentication with JWT
+
+> 🌐 Language / Ngôn ngữ: **English** | [Tiếng Việt](README.vi.md)
 
 This project is a Rails 8 API authentication service built with Devise and JWT. It supports registration, email confirmation, sign in, sign out, profile lookup, and user-management operations with admin-only access controls.
 
 ## Features
 
 - User registration with email confirmation.
-- JWT-based sign in and sign out.
+- JWT-based sign in and sign out with token revocation via denylist.
 - Profile lookup with token metadata.
 - Self-service account update and account deletion.
 - Admin-only user listing, user creation, role updates, and user deletion.
+- Rate limiting on sign-in, registration, and password-reset endpoints.
+- JWT denylist cleanup via job/task support.
+- Docker + Kamal deployment scaffolding with a health check endpoint.
 - CI with Brakeman, RuboCop, the full Rails test suite, and a dedicated auth regression job.
 
-## Stack
+## Technologies Used
 
 - Rails 8
 - Devise
@@ -41,6 +44,7 @@ bin/dev
 
 - `manual/registration.sh`
 - `manual/session.sh`
+- `manual/password.sh`
 - `manual/user.sh`
 
 ## Local Auth Quick Start
@@ -102,20 +106,26 @@ curl -sS -X DELETE http://localhost:3000/users/sign_out \
   -H "Authorization: Bearer ${TOKEN}" | jq .
 ```
 
-8. Optionally inspect the broader request references in `manual/session.sh`, `manual/registration.sh`, and `manual/user.sh` for invalid-token, expired-token, and admin/user-management examples.
+8. Optionally inspect the broader request references in `manual/session.sh`, `manual/registration.sh`, `manual/password.sh`, and `manual/user.sh` for invalid-token, expired-token, password-reset, and admin/user-management examples.
 
 ## Environment
 
-The sample environment file currently contains the minimum local settings:
+Copy `.env.sample` to `.env` for local development:
 
-```env
-RAILS_LOG_TO_STDOUT=true
-RAILS_ENV=development
-PORT=4000
-RAILS_MAX_THREADS=1
+```bash
+cp .env.sample .env
 ```
 
-If you do not set `PORT`, `bin/dev` boots on `3000` locally.
+Minimum required settings for local development:
+
+```env
+RAILS_ENV=development
+RAILS_LOG_TO_STDOUT=true
+PORT=4000
+RAILS_MAX_THREADS=3
+```
+
+If you do not set `PORT`, `bin/dev` boots on `3000` locally. The full variable reference — including production secrets, Puma concurrency, mailer, admin seed, CORS, and the manual JWT token slot — is documented in `.env.sample`.
 
 ## Code Coverage
 
@@ -125,7 +135,9 @@ Generate a coverage report locally with SimpleCov by running the test suite with
 COVERAGE=1 bin/rails test
 ```
 
-The report is written to `public/coverage`. While the Rails server is running in development, open `http://localhost:3000/coverage` to view the latest generated report. This route is development-only and simply redirects to the static HTML report.
+When `COVERAGE=1` is set, the test suite runs without Rails parallel workers so the SimpleCov report stays accurate.
+
+The report is written to `public/coverage`. While the Rails server is running in development, open `http://localhost:3000/coverage` to view the latest generated report. This development-only endpoint redirects to the static HTML report.
 
 Internally, the app redirects `/coverage` to `/coverage/` before the static file server handles the request. The trailing slash matters because the generated SimpleCov HTML references assets with relative paths such as `./assets/...`.
 
@@ -141,6 +153,8 @@ The route contract below reflects `config/routes.rb` and the current controller 
 | POST | `/users/sign_in` | Sign in and receive JWT in the `Authorization` response header |
 | DELETE | `/users/sign_out` | Sign out and revoke the current token |
 | GET | `/users/confirmation` | Confirm email via Devise confirmable flow |
+| POST | `/users/password` | Send password reset instructions |
+| PUT/PATCH | `/users/password` | Reset password with a token |
 | PUT/PATCH | `/users` | Update the current signed-in account |
 | DELETE | `/users` | Delete the current signed-in account |
 
@@ -161,6 +175,14 @@ The route contract below reflects `config/routes.rb` and the current controller 
 | GET | `/users/:id` | View a user; admin or self |
 | PUT | `/users/:id` | Update a user; admin or self |
 | DELETE | `/users/:id` | Delete a user; admin or self |
+
+### Utility Routes
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/` | Root welcome endpoint |
+| GET | `/home` | Welcome endpoint alias |
+| GET | `/up` | Health check for uptime/load balancers |
 
 ## Request Format Notes
 
@@ -248,6 +270,7 @@ The files below currently reflect the implementation more accurately than the or
 
 - [manual/registration.sh](./manual/registration.sh)
 - [manual/session.sh](./manual/session.sh)
+- [manual/password.sh](./manual/password.sh)
 - [manual/user.sh](./manual/user.sh)
 
 ## Improvement Planning
