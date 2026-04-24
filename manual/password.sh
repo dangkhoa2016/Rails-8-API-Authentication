@@ -1,3 +1,7 @@
+# Set TEST_JWT_TOKEN env var before using these examples:
+#   export TEST_JWT_TOKEN="your-jwt-token-here"
+TOKEN="${TEST_JWT_TOKEN:-<your-jwt-token-here>}"
+
 
 # 1 - Sign In as role: user
 curl -X POST -H "Content-Type: application/json" -d '{
@@ -6,16 +10,16 @@ curl -X POST -H "Content-Type: application/json" -d '{
     "password": "password"
   }
 }' "http://localhost:4000/users/sign_in" -i
-# eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3Mjg4OTE0LCJleHAiOjE3MzcyOTI1MTQsImp0aSI6ImU4NDI0NWUzLTJlNzItNGRmZi1hN2NlLTc5NjYyOGJhNzNkYSJ9.Eg6ANKg_H5ZdOlUOBFMIS5xtzVyo5JKcQD7GfQZGv_c
+# ${TEST_JWT_TOKEN:-<your-jwt-token-here>}
 
 # 2 - Get user's password edit form
 curl -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3Mjg4OTE0LCJleHAiOjE3MzcyOTI1MTQsImp0aSI6ImU4NDI0NWUzLTJlNzItNGRmZi1hN2NlLTc5NjYyOGJhNzNkYSJ9.Eg6ANKg_H5ZdOlUOBFMIS5xtzVyo5JKcQD7GfQZGv_c" \
+  -H "Authorization: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}" \
   "http://localhost:4000/users/password/new" | jq .
 
 # 3 - Create a password reset request
 curl -X POST -H "Content-Type: application/json" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3Mjg4OTE0LCJleHAiOjE3MzcyOTI1MTQsImp0aSI6ImU4NDI0NWUzLTJlNzItNGRmZi1hN2NlLTc5NjYyOGJhNzNkYSJ9.Eg6ANKg_H5ZdOlUOBFMIS5xtzVyo5JKcQD7GfQZGv_c" \
+  -H "Authorization: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}" \
   "http://localhost:4000/users/password" \
   -d '{
       "user": {
@@ -39,7 +43,7 @@ curl -X POST -H "Content-Type: application/json" \
 
 # 3 - Update user's password
 curl -X PUT -H "Content-Type: application/json" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3Mjg4OTE0LCJleHAiOjE3MzcyOTI1MTQsImp0aSI6ImU4NDI0NWUzLTJlNzItNGRmZi1hN2NlLTc5NjYyOGJhNzNkYSJ9.Eg6ANKg_H5ZdOlUOBFMIS5xtzVyo5JKcQD7GfQZGv_c" \
+  -H "Authorization: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}" \
   "http://localhost:4000/users/password" \
   -d '{
       "user": {

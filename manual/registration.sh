@@ -1,3 +1,7 @@
+# Set TEST_JWT_TOKEN env var before using these examples:
+#   export TEST_JWT_TOKEN="your-jwt-token-here"
+TOKEN="${TEST_JWT_TOKEN:-<your-jwt-token-here>}"
+
 # 1 - Sign Up
 curl -X POST -H "Content-Type: application/json" -d '{
   "user": {
@@ -29,16 +33,16 @@ curl -X POST -H "Content-Type: application/json" -d '{
     "password": "password"
   }
 }' "http://localhost:4000/users/sign_in" -i
-# eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3Mjg4OTE0LCJleHAiOjE3MzcyOTI1MTQsImp0aSI6ImU4NDI0NWUzLTJlNzItNGRmZi1hN2NlLTc5NjYyOGJhNzNkYSJ9.Eg6ANKg_H5ZdOlUOBFMIS5xtzVyo5JKcQD7GfQZGv_c
+# ${TEST_JWT_TOKEN:-<your-jwt-token-here>}
 
 # 2 - Get user's profile edit form
 curl -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3Mjg4OTE0LCJleHAiOjE3MzcyOTI1MTQsImp0aSI6ImU4NDI0NWUzLTJlNzItNGRmZi1hN2NlLTc5NjYyOGJhNzNkYSJ9.Eg6ANKg_H5ZdOlUOBFMIS5xtzVyo5JKcQD7GfQZGv_c" \
+  -H "Authorization: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}" \
   "http://localhost:4000/users/edit" | jq .
 
 # 2 - Update user's profile
 curl -X PUT -H "Content-Type: application/json" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3Mjg4OTE0LCJleHAiOjE3MzcyOTI1MTQsImp0aSI6ImU4NDI0NWUzLTJlNzItNGRmZi1hN2NlLTc5NjYyOGJhNzNkYSJ9.Eg6ANKg_H5ZdOlUOBFMIS5xtzVyo5JKcQD7GfQZGv_c" \
+  -H "Authorization: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}" \
   -d '{
     "user": {
       "username": "user1",
@@ -65,7 +69,7 @@ curl -X PUT -H "Content-Type: application/json" \
 
 # 3 - Update user's email
 curl -X PUT -H "Content-Type: application/json" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3Mjg4OTE0LCJleHAiOjE3MzcyOTI1MTQsImp0aSI6ImU4NDI0NWUzLTJlNzItNGRmZi1hN2NlLTc5NjYyOGJhNzNkYSJ9.Eg6ANKg_H5ZdOlUOBFMIS5xtzVyo5JKcQD7GfQZGv_c" \
+  -H "Authorization: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}" \
   -d '{
     "user": {
       "email": "test_updated@local.test",
@@ -90,7 +94,7 @@ curl -X PUT -H "Content-Type: application/json" \
 
 # 4 - Delete user's account
 curl -X DELETE -H "Content-Type: application/json" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3Mjg4OTE0LCJleHAiOjE3MzcyOTI1MTQsImp0aSI6ImU4NDI0NWUzLTJlNzItNGRmZi1hN2NlLTc5NjYyOGJhNzNkYSJ9.Eg6ANKg_H5ZdOlUOBFMIS5xtzVyo5JKcQD7GfQZGv_c" \
+  -H "Authorization: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}" \
   "http://localhost:4000/users" | jq .
 {
   "message": "Bye! Your account has been successfully cancelled. We hope to see you again soon.",
