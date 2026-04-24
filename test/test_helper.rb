@@ -1,6 +1,7 @@
 if ENV["COVERAGE"]
   require "simplecov"
   SimpleCov.start "rails" do
+    coverage_dir "public/coverage"
     add_filter "/test/"
     add_filter "/config/"
     add_filter "/vendor/"

@@ -1,7 +1,10 @@
 require "active_support/core_ext/integer/time"
+require Rails.root.join("lib/coverage_report_redirect_middleware")
 
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
+
+  config.middleware.insert_before ActionDispatch::Static, CoverageReportRedirectMiddleware
 
   # Make code changes take effect immediately without server restart.
   config.enable_reloading = true
