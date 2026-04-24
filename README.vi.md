@@ -6,15 +6,16 @@ Dự án này là một dịch vụ xác thực API Rails 8 được xây dựng
 
 ## Tính năng
 
-- Đăng ký người dùng với xác nhận email.
+- Đăng ký người dùng với `username` bắt buộc và xác nhận email.
 - Đăng nhập và đăng xuất dựa trên JWT với cơ chế thu hồi token thông qua denylist.
-- Truy vấn hồ sơ kèm metadata của token (phân biệt token hết hạn và token đã bị thu hồi).
+- Truy vấn hồ sơ kèm metadata của token qua `/user/profile` và các alias tương thích `/user/me`, `/user/whoami`.
 - Cập nhật tài khoản và xóa tài khoản theo cơ chế self-service.
 - Các chức năng chỉ dành cho admin: danh sách người dùng, tạo người dùng, quản lý vai trò, và xóa người dùng.
 - Giới hạn tần suất truy cập (rate limiting) cho các endpoint đăng nhập, đăng ký, và reset mật khẩu (rack-attack).
 - Dọn dẹp denylist JWT bằng Rake task.
 - Triển khai với Docker + Kamal, có health check cho container.
 - CI với Brakeman, RuboCop, toàn bộ test suite của Rails, và một job riêng cho regression test của auth.
+- Bảo vệ chống SSRF: chặn các địa chỉ loopback, địa chỉ nội bộ (private) và link-local, bao gồm cả IPv6 fe80::/10.
 
 ## Công nghệ sử dụng
 
@@ -61,6 +62,7 @@ curl -sS -X POST http://localhost:3000/users \
   -d '{
     "user": {
       "email": "user@example.com",
+      "username": "user1",
       "password": "password",
       "password_confirmation": "password"
     }
@@ -125,7 +127,9 @@ PORT=4000
 RAILS_MAX_THREADS=3
 ```
 
-Nếu không thiết lập `PORT`, `bin/dev` sẽ chạy mặc định trên `3000`. Toàn bộ danh sách biến môi trường — bao gồm secret cho production, cấu hình Puma, mailer, admin seed, CORS, và JWT token cho manual scripts — được mô tả trong `.env.sample`.
+Nếu không thiết lập `PORT`, `bin/dev` sẽ chạy mặc định trên `3000`. File `.env.sample` hiện đặt sẵn `PORT=4000`, nên nếu bạn copy nguyên file này thì local sẽ chạy tại `http://localhost:4000`. Toàn bộ danh sách biến môi trường — bao gồm secret cho production, cấu hình Puma, mailer, admin seed, CORS, và JWT token cho manual scripts — được mô tả trong `.env.sample`.
+
+Với browser client chạy khác origin, cấu hình CORS mặc định cho phép request từ `CORS_ALLOWED_ORIGINS` nhưng **không** expose response header `Authorization`. Nếu frontend cần đọc JWT từ response đăng nhập, hãy cập nhật `config/initializers/cors.rb` để expose header này một cách rõ ràng.
 
 ## Code Coverage
 
@@ -166,6 +170,8 @@ Các route dưới đây phản ánh `config/routes.rb` và implementation hiệ
 | GET    | `/user/me`      | Alias tương thích    |
 | GET    | `/user/whoami`  | Alias tương thích    |
 
+Cả ba route hồ sơ này cùng trỏ vào một action controller và trả về cùng một cấu trúc response.
+
 ### Route quản lý người dùng & admin
 
 | Method | Path            | Mục đích                                    |
@@ -186,7 +192,7 @@ Các route dưới đây phản ánh `config/routes.rb` và implementation hiệ
 
 ## Ghi chú về format request
 
-Các endpoint của Devise yêu cầu payload được lồng dưới key `user`.
+Các endpoint của Devise yêu cầu payload được lồng dưới key `user`. Với endpoint đăng ký `POST /users`, trường `username` là bắt buộc.
 
 Ví dụ request đăng ký:
 
@@ -194,6 +200,7 @@ Ví dụ request đăng ký:
 {
   "user": {
     "email": "user@example.com",
+    "username": "user1",
     "password": "password",
     "password_confirmation": "password"
   }
@@ -211,6 +218,13 @@ Ví dụ request đăng nhập:
 }
 ```
 
+Request self-service cập nhật tài khoản trên `PUT /users` hoặc `PATCH /users` bắt buộc phải có `current_password`. Các request admin-managed trên `PUT /users/:id` đi qua `UsersController` nên không yêu cầu `current_password`.
+
+Endpoint profile cũng có 2 kiểu lỗi xác thực khác nhau:
+
+- Token thiếu, hết hạn, hoặc đã bị thu hồi: `422` với `user: null` và `token_info`
+- Token bị lỗi format/malformed: `422` với `{ "error": "Invalid token" }`
+
 ## Luồng ví dụ
 
 ### 1. Đăng ký
@@ -221,6 +235,7 @@ curl -X POST http://localhost:3000/users \
   -d '{
     "user": {
       "email": "user@example.com",
+      "username": "user1",
       "password": "password",
       "password_confirmation": "password"
     }
@@ -255,6 +270,8 @@ curl http://localhost:3000/user/profile \
   -H "Authorization: Bearer <jwt_token>"
 ```
 
+`/user/me` và `/user/whoami` là các alias tương thích cho cùng một response.
+
 ### 5. Đăng xuất
 
 ```bash
@@ -277,6 +294,15 @@ Các file dưới đây chứa ví dụ curl để copy/paste, dùng làm tài l
 * [manual/session.sh](./manual/session.sh)
 * [manual/password.sh](./manual/password.sh)
 * [manual/user.sh](./manual/user.sh)
+
+## Tài liệu chuyên sâu
+
+Thư mục `docs/` chứa các ghi chú chi tiết hơn về implementation và vận hành của hệ thống xác thực hiện tại:
+
+* [docs/ACCESS_CONTROL.vi.md](./docs/ACCESS_CONTROL.vi.md) - Quy tắc phân quyền cho guest, self-service, và admin
+* [docs/JWT_LIFECYCLE.vi.md](./docs/JWT_LIFECYCLE.vi.md) - Vòng đời JWT, metadata ở endpoint profile, thu hồi, và dọn dẹp denylist
+* [docs/RATE_LIMITING.vi.md](./docs/RATE_LIMITING.vi.md) - Các ngưỡng Rack::Attack hiện tại, response khi throttle, và lưu ý sau reverse proxy
+* [docs/DEPLOYMENT.vi.md](./docs/DEPLOYMENT.vi.md) - Triển khai với Kamal, Docker, biến môi trường, health check, và persistence của SQLite
 
 ## Dự án liên quan
 
