@@ -1,3 +1,7 @@
+# Set TEST_JWT_TOKEN env var before using these examples:
+#   export TEST_JWT_TOKEN="your-jwt-token-here"
+TOKEN="${TEST_JWT_TOKEN:-<your-jwt-token-here>}"
+
 # 1 - Sign Up
 curl -X POST -H "Content-Type: application/json" -d '{
   "user": {
@@ -72,7 +76,7 @@ x-permitted-cross-domain-policies: none
 referrer-policy: strict-origin-when-cross-origin
 location: /
 content-type: application/json; charset=utf-8
-authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MTAyODUwLCJleHAiOjE3MzcxMDY0NTAsImp0aSI6IjQ1OWEzMzhmLTA3MzgtNDJkYi04ODZmLTc5ZjM1MTliODc5OCJ9.7so7q1Mo_sJku4H_wpseN-fw4l8gigqU64zOpu4UmZc
+authorization: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}
 etag: W/"f8df4ddaed8726a8beed27240b4408ca"
 cache-control: max-age=0, private, must-revalidate
 x-request-id: 60a01b68-f862-467c-8a34-1181d2fba3ca
@@ -93,7 +97,7 @@ curl -X POST -H "Content-Type: application/json" -d '{
 {"error":"Invalid Email or password."}
 
 # 5 - Sign Out: Valid Token
-curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MTAyODUwLCJleHAiOjE3MzcxMDY0NTAsImp0aSI6IjQ1OWEzMzhmLTA3MzgtNDJkYi04ODZmLTc5ZjM1MTliODc5OCJ9.7so7q1Mo_sJku4H_wpseN-fw4l8gigqU64zOpu4UmZc" \
+curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}" \
 "http://localhost:4000/users/sign_out" | jq .
 {
   "message": "Your account: user@example.com has been signed out successfully."
@@ -105,7 +109,7 @@ curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer tes
 {"error":"Invalid token"}
 
 # 6 - Get Signed In User JSON Data
-curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MjYxNTk3LCJleHAiOjE3MzcyNjUxOTcsImp0aSI6IjNlNGNlYmZmLTRkZGMtNGMzNy05MTI1LTBkNjdhMWM2ODAxZSJ9.5lHosClrKK6fK52ONzhxFR-uTt5Lc5mYPSwSkLs31gw" \
+curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}" \
 "http://localhost:4000/user/profile" | jq .
 {
   "user": {
@@ -120,7 +124,7 @@ curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbG
     "updated_at": "2025-01-17T13:59:07.175Z"
   },
   "token_info": {
-    "token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MjYxNTk3LCJleHAiOjE3MzcyNjUxOTcsImp0aSI6IjNlNGNlYmZmLTRkZGMtNGMzNy05MTI1LTBkNjdhMWM2ODAxZSJ9.5lHosClrKK6fK52ONzhxFR-uTt5Lc5mYPSwSkLs31gw",
+    "token": "<your-jwt-token-here>",
     "user_id": 2,
     "expired_at": "2025-01-17T14:41:53.000+00:00",
     "expired_in": 2566,
@@ -130,7 +134,7 @@ curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbG
 }
 
 # 6 - Get Signed In User JSON Data
-curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MjYxNTk3LCJleHAiOjE3MzcyNjUxOTcsImp0aSI6IjNlNGNlYmZmLTRkZGMtNGMzNy05MTI1LTBkNjdhMWM2ODAxZSJ9.5lHosClrKK6fK52ONzhxFR-uTt5Lc5mYPSwSkLs31gw" \
+curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}" \
 "http://localhost:4000/user/me" | jq .
 {
   "user": {
@@ -145,7 +149,7 @@ curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbG
     "updated_at": "2025-01-17T13:59:07.175Z"
   },
   "token_info": {
-    "token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MjYxNTk3LCJleHAiOjE3MzcyNjUxOTcsImp0aSI6IjNlNGNlYmZmLTRkZGMtNGMzNy05MTI1LTBkNjdhMWM2ODAxZSJ9.5lHosClrKK6fK52ONzhxFR-uTt5Lc5mYPSwSkLs31gw",
+    "token": "<your-jwt-token-here>",
     "user_id": 2,
     "expired_at": "2025-01-17T14:41:53.000+00:00",
     "expired_in": 2566,
@@ -155,7 +159,7 @@ curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbG
 }
 
 # 6 - Get Signed In User JSON Data
-curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MjYxNTk3LCJleHAiOjE3MzcyNjUxOTcsImp0aSI6IjNlNGNlYmZmLTRkZGMtNGMzNy05MTI1LTBkNjdhMWM2ODAxZSJ9.5lHosClrKK6fK52ONzhxFR-uTt5Lc5mYPSwSkLs31gw" \
+curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}" \
 "http://localhost:4000/user/whoami" | jq .
 {
   "user": {
@@ -170,7 +174,7 @@ curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbG
     "updated_at": "2025-01-17T13:59:07.175Z"
   },
   "token_info": {
-    "token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MjYxNTk3LCJleHAiOjE3MzcyNjUxOTcsImp0aSI6IjNlNGNlYmZmLTRkZGMtNGMzNy05MTI1LTBkNjdhMWM2ODAxZSJ9.5lHosClrKK6fK52ONzhxFR-uTt5Lc5mYPSwSkLs31gw",
+    "token": "<your-jwt-token-here>",
     "user_id": 2,
     "expired_at": "2025-01-17T14:41:53.000+00:00",
     "expired_in": 2566,
@@ -180,19 +184,19 @@ curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbG
 }
 
 # 7 - Get Signed In User JSON Data: Invalid Token
-curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MTIxMzEzLCJleHAiOjE3MzcxMjQ5MTMsImp0aSI6Ijk0Njg1Mzg0LWRhODktNGYxYS1iODQ5LTExNGM0YzdhZDRmOSJ9.J1mlfI4_aGwS1h2buVXolYq7vIQGiDtnwBN9_QtVnDk" \
+curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}" \
 "http://localhost:4000/user/profile" | jq .
 {
   "error": "Invalid token"
 }
 
 # 7 - Get Signed In User JSON Data: Expired Token
-curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MTAyODUwLCJleHAiOjE3MzcxMDY0NTAsImp0aSI6IjQ1OWEzMzhmLTA3MzgtNDJkYi04ODZmLTc5ZjM1MTliODc5OCJ9.7so7q1Mo_sJku4H_wpseN-fw4l8gigqU64zOpu4UmZc" \
+curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}" \
 "http://localhost:4000/user/profile" | jq .
 {
   "user": null,
   "token_info": {
-    "token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MTAyODUwLCJleHAiOjE3MzcxMDY0NTAsImp0aSI6IjQ1OWEzMzhmLTA3MzgtNDJkYi04ODZmLTc5ZjM1MTliODc5OCJ9.7so7q1Mo_sJku4H_wpseN-fw4l8gigqU64zOpu4UmZc",
+    "token": "<your-jwt-token-here>",
     "user_id": "2",
     "expired_at": "2025-01-17T09:34:10.000+00:00",
     "expired_in": -16482,

@@ -10,7 +10,7 @@ module UserAccessControl
 
     return if admin_or_current_user?
 
-    render json: { error: I18n.t("errors.must_be_adminstrator") }, status: :unauthorized
+    render json: { error: I18n.t("errors.must_be_administrator") }, status: :unauthorized
   end
 
   def admin_or_current_user?

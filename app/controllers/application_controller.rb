@@ -11,6 +11,14 @@ class ApplicationController < ActionController::API
   # rescue_from ActionController::RoutingError, with: :route_not_found
   rescue_from ActionController::UnknownFormat, with: :route_not_found
 
+  # Handle errors for path not found
+  def route_not_found
+    logger.error "Route not found: #{request.url}"
+    render json: { error: I18n.translate("errors.route_not_found") }, status: 404
+  end
+
+  private
+
   def decode_token(token_string)
     begin
        Warden::JWTAuth::TokenDecoder.new.call token_string
@@ -22,14 +30,6 @@ class ApplicationController < ActionController::API
       })
     end
   end
-
-  # Handle errors for path not found
-  def route_not_found
-    logger.error "Route not found: #{request.url}"
-    render json: { error: I18n.translate("errors.route_not_found") }, status: 404
-  end
-
-  private
 
   def configure_permitted_parameters
     fields = [ :first_name, :last_name, :username, :email, :password, :password_confirmation ]
