@@ -14,7 +14,7 @@ SimpleCov.formatter = SimpleCov::Formatter::Console
 # SimpleCov::ResultMerger.merged_result will load and merge old results
 begin
   result = SimpleCov::ResultMerger.merged_result
-  
+
   if result.nil?
     puts "No previous coverage data found in ./public/coverage/"
     exit 1
