@@ -7,12 +7,14 @@ class AuthFlowTest < ActionDispatch::IntegrationTest
 
   test "user can register confirm sign in view profile and sign out" do
     email = "flow.user@example.local"
+    username = "flow_user"
     password = "password"
 
     assert_difference("User.count", 1) do
       post "/users", params: {
         user: {
           email: email,
+          username: username,
           password: password,
           password_confirmation: password
         }
@@ -22,6 +24,7 @@ class AuthFlowTest < ActionDispatch::IntegrationTest
     assert_response :success
     registration_body = json_response
     assert_equal email, registration_body.dig("user", "email")
+    assert_equal username, registration_body.dig("user", "username")
     assert_match(/confirmation link has been sent/i, registration_body.fetch("message"))
 
     user = User.find_by!(email: email)

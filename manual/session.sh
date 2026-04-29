@@ -2,10 +2,11 @@
 #   export TEST_JWT_TOKEN="your-jwt-token-here"
 TOKEN="${TEST_JWT_TOKEN:-<your-jwt-token-here>}"
 
-# 1 - Sign Up
+# 1 - Sign Up (username is required)
 curl -X POST -H "Content-Type: application/json" -d '{
   "user": {
     "email": "user@example.com",
+    "username": "user1",
     "password": "password",
     "password_confirmation": "password"
   }
@@ -15,7 +16,7 @@ curl -X POST -H "Content-Type: application/json" -d '{
   "user": {
     "id": 2,
     "email": "user@example.com",
-    "username": "",
+    "username": "user1",
     "first_name": "",
     "last_name": "",
     "avatar": null,
@@ -51,7 +52,7 @@ curl -X GET "http://localhost:4000/users/confirmation?confirmation_token=SgoszqA
 {
   "id": 2,
   "email": "user@example.com",
-  "username": "",
+  "username": "user1",
   "first_name": "",
   "last_name": "",
   "avatar": null,
@@ -82,9 +83,9 @@ cache-control: max-age=0, private, must-revalidate
 x-request-id: 60a01b68-f862-467c-8a34-1181d2fba3ca
 x-runtime: 0.257309
 server-timing: start_processing.action_controller;dur=0.01, sql.active_record;dur=3.41, instantiation.active_record;dur=0.07, start_transaction.active_record;dur=0.01, transaction.active_record;dur=4.30, process_action.action_controller;dur=251.65
-Content-Length: 188
+Content-Length: 193
 
-{"id":2,"email":"user@example.com","username":"","first_name":"","last_name":"","avatar":null,"role":"user","created_at":"2025-01-16T17:32:30.315Z","updated_at":"2025-01-17T08:34:10.527Z"}
+{"id":2,"email":"user@example.com","username":"user1","first_name":"","last_name":"","avatar":null,"role":"user","created_at":"2025-01-16T17:32:30.315Z","updated_at":"2025-01-17T08:34:10.527Z"}
 
 
 # Sign In with invalid password
@@ -115,7 +116,7 @@ curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer ${TEST
   "user": {
     "id": 2,
     "email": "user@example.com",
-    "username": "",
+    "username": "user1",
     "first_name": "",
     "last_name": "",
     "avatar": null,
@@ -140,7 +141,7 @@ curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer ${TEST
   "user": {
     "id": 2,
     "email": "user@example.com",
-    "username": "",
+    "username": "user1",
     "first_name": "",
     "last_name": "",
     "avatar": null,
@@ -165,7 +166,7 @@ curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer ${TEST
   "user": {
     "id": 2,
     "email": "user@example.com",
-    "username": "",
+    "username": "user1",
     "first_name": "",
     "last_name": "",
     "avatar": null,

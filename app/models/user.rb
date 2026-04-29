@@ -7,7 +7,9 @@ class User < ApplicationRecord
          :rememberable, :validatable, :recoverable,
          :jwt_authenticatable, jwt_revocation_strategy: JwtDenylist
 
-  validates :username, uniqueness: true, allow_blank: true
+  before_validation :normalize_username
+
+    validates :username, presence: true, uniqueness: true
 
   attr_accessor :token_info
   enum :role, { user: "user", admin: "admin" }
@@ -31,5 +33,11 @@ class User < ApplicationRecord
     super
   rescue StandardError => e
     Rails.logger.error "Error sending confirmation instructions: #{e}"
+  end
+
+  private
+
+  def normalize_username
+    self.username = username.to_s.strip.presence
   end
 end

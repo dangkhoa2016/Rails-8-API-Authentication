@@ -8,16 +8,50 @@ class AccountManagementTest < ActionDispatch::IntegrationTest
   test "registration returns validation errors for duplicate email" do
     existing_user = confirmed_user("duplicate-registration@example.local")
 
+    assert_no_difference("User.count") do
+      post "/users", params: {
+        user: {
+          email: existing_user.email,
+          username: "different_username",
+          password: "password",
+          password_confirmation: "password"
+        }
+      }, as: :json
+    end
+
+    assert_response :unprocessable_entity
+    assert_includes json_response.fetch("errors"), "Email has already been taken"
+  end
+
+  test "registration returns validation errors for duplicate username" do
+    existing_user = confirmed_user("duplicate-username@example.local", username: "duplicate_username")
+
     post "/users", params: {
       user: {
-        email: existing_user.email,
+        email: "another-user@example.local",
+        username: existing_user.username,
         password: "password",
         password_confirmation: "password"
       }
     }, as: :json
 
     assert_response :unprocessable_entity
-    assert_includes json_response.fetch("errors"), "Email has already been taken"
+    assert_includes json_response.fetch("errors"), "Username has already been taken"
+  end
+
+  test "registration without username returns validation errors" do
+    assert_no_difference("User.count") do
+      post "/users", params: {
+        user: {
+          email: "blank-username@example.local",
+          password: "password",
+          password_confirmation: "password"
+        }
+      }, as: :json
+    end
+
+    assert_response :unprocessable_entity
+    assert_includes json_response.fetch("errors"), "Username can't be blank"
   end
 
   test "signed in user can update account with current password" do

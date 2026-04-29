@@ -44,7 +44,7 @@ curl -X GET "http://localhost:4000/users" \
   {
     "id": 2,
     "email": "user@example.com",
-    "username": "",
+    "username": "user1",
     "first_name": "",
     "last_name": "",
     "avatar": null,
@@ -85,7 +85,7 @@ curl -X GET "http://localhost:4000/users/2" \
 {
   "id": 2,
   "email": "user@example.com",
-  "username": "",
+  "username": "user1",
   "first_name": "",
   "last_name": "",
   "avatar": null,
@@ -101,7 +101,7 @@ curl -X GET "http://localhost:4000/users/2" \
 {
   "id": 2,
   "email": "user@example.com",
-  "username": "",
+  "username": "user1",
   "first_name": "",
   "last_name": "",
   "avatar": null,
@@ -146,6 +146,7 @@ curl -X GET "http://localhost:4000/users/100" \
 curl -X POST -H "Content-Type: application/json" -d '{
   "user": {
     "email": "test1@local.test",
+    "username": "test1_user",
     "password": "password",
     "password_confirmation": "password"
   }
@@ -160,6 +161,7 @@ curl -X POST -H "Content-Type: application/json" -d '{
 curl -X POST -H "Content-Type: application/json" -d '{
   "user": {
     "email": "test1@local.test",
+    "username": "test1_user",
     "password": "password",
     "password_confirmation": "password"
   }
@@ -169,7 +171,7 @@ curl -X POST -H "Content-Type: application/json" -d '{
 {
   "id": 4,
   "email": "test1@local.test",
-  "username": "",
+  "username": "test1_user",
   "first_name": "",
   "last_name": "",
   "avatar": null,
@@ -191,7 +193,7 @@ curl -X PUT -H "Content-Type: application/json" -d '{
 {
   "email": "user@example.com",
   "id": 2,
-  "username": "",
+  "username": "user1",
   "first_name": "",
   "last_name": "",
   "avatar": null,
@@ -214,7 +216,7 @@ curl -X PUT -H "Content-Type: application/json" -d '{
 {
   "email": "user@example.com",
   "id": 2,
-  "username": "",
+  "username": "user1",
   "first_name": "",
   "last_name": "",
   "avatar": null,

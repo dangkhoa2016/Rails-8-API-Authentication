@@ -2,10 +2,11 @@
 #   export TEST_JWT_TOKEN="your-jwt-token-here"
 TOKEN="${TEST_JWT_TOKEN:-<your-jwt-token-here>}"
 
-# 1 - Sign Up
+# 1 - Sign Up (username is required)
 curl -X POST -H "Content-Type: application/json" -d '{
   "user": {
     "email": "user@example.com",
+    "username": "user1",
     "password": "password",
     "password_confirmation": "password"
   }
@@ -15,7 +16,7 @@ curl -X POST -H "Content-Type: application/json" -d '{
   "user": {
     "id": 2,
     "email": "user@example.com",
-    "username": "",
+    "username": "user1",
     "first_name": "",
     "last_name": "",
     "avatar": null,

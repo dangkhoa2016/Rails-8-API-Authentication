@@ -23,19 +23,19 @@ class UserTest < ActiveSupport::TestCase
   # --- Email format validation ---
 
   test "should not save user with invalid email format" do
-    user = User.new(email: "not-an-email", password: "password", password_confirmation: "password")
+    user = User.new(email: "not-an-email", username: "invalid_email_user", password: "password", password_confirmation: "password")
     assert_not user.save, "Saved user with invalid email"
   end
 
   test "should not save user with duplicate email" do
-    user = User.new(email: "user1@example.local", password: "password", password_confirmation: "password")
+    user = User.new(email: "user1@example.local", username: "duplicate_email_user", password: "password", password_confirmation: "password")
     assert_not user.save, "Saved user with duplicate email"
   end
 
   # --- Role enum ---
 
   test "default role is user" do
-    user = User.new(email: "role@example.local", password: "password", password_confirmation: "password")
+    user = User.new(email: "role@example.local", username: "role_user", password: "password", password_confirmation: "password")
     assert_equal "user", user.role
   end
 
@@ -85,6 +85,18 @@ class UserTest < ActiveSupport::TestCase
     )
     assert_not user.save, "Saved user with duplicate username"
     assert_includes user.errors[:username], "has already been taken"
+  end
+
+  test "blank username is rejected" do
+    user = User.new(
+      email: "blank-username@example.local",
+      username: "   ",
+      password: "password",
+      password_confirmation: "password"
+    )
+
+    assert_not user.save
+    assert_includes user.errors[:username], "can't be blank"
   end
 
   test "serializable hash includes unconfirmed email when present" do
