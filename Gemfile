@@ -54,7 +54,7 @@ group :development, :test do
 end
 
 
-gem "devise", "~> 4.9"
+gem "devise", "~> 5.0"
 
 gem "devise-jwt", "~> 0.13.0"
 
