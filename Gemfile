@@ -21,7 +21,12 @@ gem "solid_queue"
 gem "solid_cable"
 
 # Reduces boot times through caching; required in config/boot.rb
-gem "bootsnap", require: false
+# bootsnap >= 1.20 compiles native extensions requiring Ruby 4.0+ APIs
+if RUBY_VERSION < "4"
+  gem "bootsnap", "~> 1.18.0", require: false
+else
+  gem "bootsnap", require: false
+end
 
 # Deploy this application anywhere as a Docker container [https://kamal-deploy.org]
 gem "kamal", require: false
@@ -34,6 +39,15 @@ gem "thruster", require: false
 
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
 # gem "rack-cors"
+
+# Required for Ruby 4.0+ as cgi was removed from default gems
+gem "cgi"
+
+# Required for Ruby 4.1+ as tsort will be removed from default gems
+gem "tsort"
+
+# Rails 8.0.1 is not compatible with minitest 6
+gem "minitest", "< 6"
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
