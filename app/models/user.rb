@@ -22,6 +22,22 @@ class User < ApplicationRecord
     self.token_info = { token: token, payload: payload }
   end
 
+  def serializable_hash(options = nil)
+    result = super
+
+    if unconfirmed_email.present?
+      result[:unconfirmed_email] = unconfirmed_email
+    end
+
+    result
+  end
+
+  def send_confirmation_instructions
+    super
+  rescue StandardError => e
+    puts "Error sending confirmation instructions: #{e}"
+  end
+
   private
 
   def password_required?

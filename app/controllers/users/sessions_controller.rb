@@ -21,9 +21,9 @@ class Users::SessionsController < Devise::SessionsController
     user = current_user if user_signed_in?
     if user
       sign_out(user)
-      render json: { message: "Your account: #{user&.email} has been signed out successfully." }, status: :ok
+      render json: { message: I18n.translate("user.signed_out", email: user.email) }, status: :ok
     else
-      render json: { message: "No user is signed in." }, status: :unprocessable_entity
+      render json: { message: I18n.translate("user.not_signed_in") }, status: :unprocessable_entity
     end
   end
 
@@ -41,31 +41,37 @@ class Users::SessionsController < Devise::SessionsController
   private
 
   def build_token_info(user)
-    token_info = {}
+    return empty_token_info unless user
 
-    if user
-      token_info = (user.token_info || {}).dup
-      token_info[:token] ||= get_token_from_request_headers
-      payload = token_info.delete(:payload) || {}
-      if payload.empty? && token_info[:token]
-        payload, _config = decode_token(token_info[:token])
-        payload ||= {}
-      end
-    else
-      token = get_token_from_request_headers
-      payload, _config = decode_token(token) if token
-      token_info[:token] = token
-      payload ||= {}
+    token_info = (user.token_info || {}).dup
+    token_info[:token] ||= get_token_from_request_headers
+    payload = extract_payload(token_info)
+    merge_token_metadata(token_info, payload)
+  end
+
+  def empty_token_info
+    token = get_token_from_request_headers
+    payload = token ? decode_token(token) : {}
+    merge_token_metadata({ token: token }, payload)
+  end
+
+  def extract_payload(token_info)
+    payload = token_info.delete(:payload) || {}
+    if payload.empty? && token_info[:token]
+      payload, _config = decode_token(token_info[:token])
     end
+    payload || {}
+  end
 
+  def merge_token_metadata(token_info, payload)
     expired_at = payload["exp"] || 0
-    token_info.merge({
+    token_info.merge(
       user_id: payload["sub"],
       expired_at: Time.at(expired_at).to_datetime,
       expired_in: (expired_at - Time.current.to_i).to_i,
       expired: Time.current.to_i >= expired_at,
       jti: payload["jti"]
-    })
+    )
   end
 
   def get_token_from_request_headers
