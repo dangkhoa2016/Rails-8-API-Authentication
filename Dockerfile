@@ -64,6 +64,12 @@ RUN chmod +rx /rails/bin
 
 USER 1000:1000
 
+# Health check: probe the built-in Rails /up endpoint.
+# start-period allows time for the app to boot and run db migrations before the
+# first check. Adjust interval/timeout to match your load balancer expectations.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost/up || exit 1
+
 # Entrypoint prepares the database.
 ENTRYPOINT ["/rails/bin/docker-entrypoint"]
 
