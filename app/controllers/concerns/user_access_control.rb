@@ -7,12 +7,12 @@ module UserAccessControl
 
   def authorize_user_access
     if current_user.blank?
-      return render json: { errors: I18n.t("errors.unauthorized") }, status: :unauthorized
+      return render json: { error: I18n.t("errors.unauthorized") }, status: :unauthorized
     end
 
     return if admin_or_current_user?
 
-    render json: { errors: I18n.t("errors.must_be_administrator") }, status: :unauthorized
+    render json: { error: I18n.t("errors.must_be_administrator") }, status: :unauthorized
   end
 
   def admin_or_current_user?
