@@ -7,12 +7,19 @@
 
 # Read more: https://github.com/cyu/rack-cors
 
-# Rails.application.config.middleware.insert_before 0, Rack::Cors do
-#   allow do
-#     origins "example.com"
-#
-#     resource "*",
-#       headers: :any,
-#       methods: [:get, :post, :put, :patch, :delete, :options, :head]
-#   end
-# end
+allowed_origins = ENV.fetch("CORS_ALLOWED_ORIGINS", nil)
+if allowed_origins.nil? && Rails.env.production?
+  raise "CORS_ALLOWED_ORIGINS environment variable is not set"
+end
+
+allowed_origins = (allowed_origins || "http://localhost:4000").split(",").map(&:strip).reject(&:empty?)
+
+Rails.application.config.middleware.insert_before 0, Rack::Cors do
+  allow do
+    origins allowed_origins
+
+    resource "*",
+      headers: %w[Content-Type Authorization X-Requested-With Accept Origin],
+      methods: [ :get, :post, :put, :patch, :delete, :options, :head ]
+  end
+end
