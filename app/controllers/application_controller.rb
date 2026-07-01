@@ -1,28 +1,18 @@
 # frozen_string_literal: true
 
 class ApplicationController < ActionController::API
+  include Pagy::Method
   include ActionController::MimeResponds
   respond_to :json
   before_action :configure_permitted_parameters, if: :devise_controller?
 
-  # Catch all types of errors and display messages to the user
-  rescue_from StandardError, with: :handle_internal_error
   rescue_from JWT::DecodeError, with: :handle_invalid_token
   rescue_from ActiveRecord::RecordNotFound, with: :record_not_found
   rescue_from ActionController::ParameterMissing, with: :parameter_missing
-  # rescue_from ActionController::RoutingError, with: :route_not_found
   rescue_from ActionController::UnknownFormat, with: :route_not_found
 
   def decode_token(token_string)
-    begin
-       Warden::JWTAuth::TokenDecoder.new.call token_string
-    rescue => e
-      config = [ Warden::JWTAuth.config.secret, false ]
-      JWT.decode(token_string, *config, {
-        algorithm: Warden::JWTAuth.config.algorithm,
-        verify_jti: true
-      })
-    end
+    Warden::JWTAuth::TokenDecoder.new.call(token_string)
   end
 
   # Handle errors for path not found
@@ -36,19 +26,21 @@ class ApplicationController < ActionController::API
   def configure_permitted_parameters
     fields = [ :first_name, :last_name, :username, :email, :password, :password_confirmation ]
     devise_parameter_sanitizer.permit(:sign_up, keys: fields)
-    devise_parameter_sanitizer.permit(:account_update, keys: fields)
-    # devise_parameter_sanitizer.permit(:account_update, keys: fields + [:current_password])
-  end
-
-   # Handle internal errors
-   def handle_internal_error(exception)
-    logger.error "Internal error: #{exception.message}\n#{exception.backtrace.join("\n")}"
-    render json: { error: I18n.translate("errors.internal_error") }, status: 500
+    devise_parameter_sanitizer.permit(:account_update, keys: fields + [ :current_password ])
   end
 
   def handle_invalid_token(exception)
     logger.error "Invalid token: #{exception.message}"
     render json: { error: I18n.translate("jwt.decode_error") }, status: :unauthorized
+  end
+
+  def pagy_metadata(pagy)
+    {
+      current_page: pagy.page,
+      per_page: pagy.limit,
+      total_count: pagy.count,
+      total_pages: pagy.last
+    }
   end
 
   # Handle record not found errors
