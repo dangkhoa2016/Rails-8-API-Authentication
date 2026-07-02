@@ -25,19 +25,19 @@ class UserTest < ActiveSupport::TestCase
   # --- Email format validation ---
 
   test "should not save user with invalid email format" do
-    user = User.new(email: "not-an-email", password: "password", password_confirmation: "password")
+    user = User.new(email: "not-an-email", username: "invalid_email_user", password: "password", password_confirmation: "password")
     assert_not user.save, "Saved user with invalid email"
   end
 
   test "should not save user with duplicate email" do
-    user = User.new(email: "user1@example.local", password: "password", password_confirmation: "password")
+    user = User.new(email: "user1@example.local", username: "duplicate_email_user", password: "password", password_confirmation: "password")
     assert_not user.save, "Saved user with duplicate email"
   end
 
   # --- Role enum ---
 
   test "default role is user" do
-    user = User.new(email: "role@example.local", password: "password", password_confirmation: "password")
+    user = User.new(email: "role@example.local", username: "role_user", password: "password", password_confirmation: "password")
     assert_equal "user", user.role
   end
 
@@ -89,6 +89,18 @@ class UserTest < ActiveSupport::TestCase
     assert_includes user.errors[:username], "has already been taken"
   end
 
+  test "blank username is normalized to nil" do
+    user = User.new(
+      email: "blank-username@example.local",
+      username: "   ",
+      password: "password",
+      password_confirmation: "password"
+    )
+
+    assert user.save
+    assert_nil user.reload.username
+  end
+
   test "serializable hash includes unconfirmed email when present" do
     user = User.new(
       email: "reconfirm@example.local",
@@ -99,6 +111,33 @@ class UserTest < ActiveSupport::TestCase
     )
 
     assert_equal "pending@example.local", user.serializable_hash[:unconfirmed_email]
+  end
+
+  # --- find_for_database_authentication ---
+
+  test "finds user by email" do
+    user = User.find_for_database_authentication(email: "user1@example.local")
+    assert_equal users(:one), user
+  end
+
+  test "finds user by username" do
+    user = User.find_for_database_authentication(email: "user1")
+    assert_equal users(:one), user
+  end
+
+  test "finds user by username when no email matches" do
+    user = User.find_for_database_authentication(email: "admin_user")
+    assert_equal users(:admin), user
+  end
+
+  test "returns nil for nonexistent email or username" do
+    assert_nil User.find_for_database_authentication(email: "nonexistent@example.com")
+    assert_nil User.find_for_database_authentication(email: "completely_unknown")
+  end
+
+  test "returns nil for blank login" do
+    assert_nil User.find_for_database_authentication(email: "")
+    assert_nil User.find_for_database_authentication(email: nil)
   end
 
   test "send confirmation instructions logs and swallows delivery errors" do
