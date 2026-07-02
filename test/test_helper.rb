@@ -2,10 +2,10 @@
 
 if ENV["COVERAGE"]
   require "simplecov"
-  require 'simplecov-console'
+  require "simplecov-console"
   SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter.new([
     SimpleCov::Formatter::HTMLFormatter,
-    SimpleCov::Formatter::Console,
+    SimpleCov::Formatter::Console
   ])
 
   SimpleCov.start "rails" do
@@ -19,6 +19,7 @@ end
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
+require "minitest/mock"
 require "cgi"
 require "devise"
 require "devise/jwt/test_helpers"
@@ -27,7 +28,7 @@ require "securerandom"
 module ActiveSupport
   class TestCase
     # Run tests in parallel with specified workers
-    parallelize(workers: :number_of_processors)
+    parallelize(workers: :number_of_processors) unless ENV["COVERAGE"]
 
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
     fixtures :all
