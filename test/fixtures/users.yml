@@ -11,6 +11,7 @@ one:
 
 two:
   email: 'user2@example.local'
+  username: 'user2'
 
 admin:
   email: 'admin@local.test'

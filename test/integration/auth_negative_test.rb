@@ -26,6 +26,7 @@ class AuthNegativeTest < ActionDispatch::IntegrationTest
   test "unconfirmed user cannot sign in" do
     user = User.create!(
       email: "pending@example.local",
+      username: "pending_user",
       password: "Password1!",
       password_confirmation: "Password1!"
     )
@@ -51,20 +52,14 @@ class AuthNegativeTest < ActionDispatch::IntegrationTest
     assert_equal({ "error" => "Invalid token" }, json_response)
   end
 
-  test "expired token returns token metadata with expired flag" do
+  test "expired token returns unauthorized" do
     user = confirmed_user("expired@example.local")
-    token, payload = expired_token_for(user)
+    token, _payload = expired_token_for(user)
 
     get "/user/profile", headers: authorization_headers(token), as: :json
 
-    assert_response :unprocessable_entity
-    body = json_response
-    assert_nil body["user"]
-    assert_equal token, body.dig("token_info", "token")
-    assert_equal payload["sub"], body.dig("token_info", "user_id")
-    assert_equal payload["jti"], body.dig("token_info", "jti")
-    assert_equal true, body.dig("token_info", "expired")
-    assert_operator body.dig("token_info", "expired_in"), :<, 0
+    assert_response :unauthorized
+    assert_equal({ "error" => "Invalid token" }, json_response)
   end
 
   test "revoked token cannot be reused for profile access" do

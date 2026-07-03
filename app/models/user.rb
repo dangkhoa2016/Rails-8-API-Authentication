@@ -14,6 +14,8 @@ class User < ApplicationRecord
     message: "must include at least 1 uppercase letter, 1 lowercase letter, and 1 number"
   }, if: :password_required?
 
+  validates :username, uniqueness: true, allow_blank: true
+
   attr_accessor :token_info
   enum :role, { user: "user", admin: "admin" }
 
@@ -35,7 +37,7 @@ class User < ApplicationRecord
   def send_confirmation_instructions
     super
   rescue StandardError => e
-    puts "Error sending confirmation instructions: #{e}"
+    Rails.logger.error "Error sending confirmation instructions: #{e}"
   end
 
   private
