@@ -6,19 +6,11 @@ module UserAccessControl
   private
 
   def authorize_user_access
-    if current_user.blank?
-      return render json: { errors: I18n.t("errors.unauthorized") }, status: :unauthorized
-    end
+    return render(json: { error: I18n.t("errors.unauthorized") }, status: :unauthorized) unless current_user
+    return if current_user.admin?
+    return if action_name.in?(%w[update destroy show]) &&
+              current_user.id.to_s == params[:id].to_s
 
-    return if admin_or_current_user?
-
-    render json: { errors: I18n.t("errors.must_be_administrator") }, status: :unauthorized
-  end
-
-  def admin_or_current_user?
-    return true if current_user.admin?
-    return false unless action_name.in?(%w[update destroy show])
-
-    current_user.id.to_s == params[:id].to_s
+    render json: { error: I18n.t("errors.must_be_administrator") }, status: :unauthorized
   end
 end
