@@ -14,6 +14,29 @@ class UserControllerTest < ActionDispatch::IntegrationTest
   test "should get index" do
     get users_url, as: :json
     assert_response :success
+    body = json_response
+    assert body.key?("users")
+    assert body.key?("meta")
+    meta = body["meta"]
+    assert_equal 1, meta["current_page"]
+    assert_equal 20, meta["per_page"]
+    assert meta["total_count"] > 0
+    assert meta["total_pages"] > 0
+  end
+
+  test "index supports custom per_page" do
+    get users_url(per_page: 2), as: :json
+    assert_response :success
+    body = json_response
+    assert_equal 2, body["meta"]["per_page"]
+    assert body["users"].length <= 2
+  end
+
+  test "index caps per_page at 100" do
+    get users_url(per_page: 999), as: :json
+    assert_response :success
+    body = json_response
+    assert_equal 100, body["meta"]["per_page"]
   end
 
   test "should create user" do
@@ -139,5 +162,19 @@ class UserControllerTest < ActionDispatch::IntegrationTest
     }, as: :json
     assert_response :unprocessable_entity
     assert_not_nil json_response["errors"]
+  end
+
+  # --- Error handling branches ---
+
+  test "destroy handles failure" do
+    user = User.find(@user_test.id)
+    user.define_singleton_method(:destroy) { false }
+    original_find = User.method(:find_by_id!)
+    User.define_singleton_method(:find_by_id!) { |id| user }
+
+    delete user_url(@user_test), as: :json
+    assert_response :unprocessable_entity
+  ensure
+    User.singleton_class.define_method(:find_by_id!, original_find)
   end
 end
