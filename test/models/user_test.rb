@@ -140,6 +140,38 @@ class UserTest < ActiveSupport::TestCase
     assert_nil User.find_for_database_authentication(email: nil)
   end
 
+  # --- active_for_authentication? ---
+
+  test "active user is active for authentication" do
+    assert users(:admin).active_for_authentication?
+  end
+
+  test "inactive user is not active for authentication" do
+    user = users(:admin)
+    user.update!(active: false)
+    assert_not user.active_for_authentication?
+  end
+
+  test "inactive message for active user delegates to super" do
+    assert_equal :inactive, users(:admin).inactive_message
+  end
+
+  test "inactive message for deactivated user" do
+    user = users(:admin)
+    user.update!(active: false)
+    assert_equal :account_inactive, user.inactive_message
+  end
+
+  test "active defaults to true for new users" do
+    user = User.new(
+      email: "active-default@example.local",
+      username: "active_default_user",
+      password: "password",
+      password_confirmation: "password"
+    )
+    assert user.active?
+  end
+
   test "send confirmation instructions logs and swallows delivery errors" do
     user = User.create!(
       email: "delivery-error@example.local",
@@ -162,13 +194,13 @@ class UserTest < ActiveSupport::TestCase
     }.new
 
     user.define_singleton_method(:send_devise_notification) do |*_args|
-      raise StandardError, "mailer exploded"
+      raise Net::SMTPFatalError, "mailer exploded"
     end
 
     Rails.stub(:logger, logger) do
       assert_nil user.send_confirmation_instructions
     end
 
-    assert_includes logger.messages, "Error sending confirmation instructions: mailer exploded"
+    assert_includes logger.messages, "Failed to send confirmation instructions to delivery-error@example.local: Net::SMTPFatalError - mailer exploded"
   end
 end
