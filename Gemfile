@@ -61,9 +61,14 @@ group :development, :test do
 
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
-  
+
   # Load environment variables from .env files
   gem "dotenv"
+
+  # Code coverage
+  gem "simplecov", require: false
+  gem "simplecov-console", require: false
+  gem "json", "~> 2.10.0", require: false if RUBY_VERSION.start_with?("3.2")
 end
 
 
