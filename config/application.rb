@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "../lib/exception_middleware"
 require_relative 'boot'
 require 'rails/all'
 require 'dotenv/load' if Rails.env.development? || Rails.env.test?
@@ -13,9 +14,8 @@ module Rails8ApiAuthentication
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.0
 
-    # Please, add to the `ignore` list any other `lib` subdirectories that do
-    # not contain `.rb` files, or that should not be reloaded or eager loaded.
-    # Common ones are `templates`, `generators`, or `middleware`, for example.
+    # Please, add to the `config` `ignore` list any files that are not Ruby
+    # files, so that Rails does not add `.rb` extensions to them.
     config.autoload_lib(ignore: %w[assets tasks])
 
     # Configuration for the application, engines, and railties goes here.
@@ -27,8 +27,15 @@ module Rails8ApiAuthentication
     # config.eager_load_paths << Rails.root.join("extras")
 
     # Only loads a smaller set of middleware suitable for API only apps.
-    # Middleware like session, flash, cookies can be added back manually.
-    # Skip views, helpers and assets when generating a new resource.
-    config.api_only = true
+    # Middleware like session, flash, cookies can be added back arbitrarily.
+    #
+    # Middleware that Rack considers "common" is already handled by Rails.
+    # config.session_store :cookie_store, key: "_interslice_session"
+    #
+    # This is the default Rails middleware stack for API-only apps.
+    # config.middleware.use ActionDispatch::Cookies
+    # config.middleware.use ActionDispatch::Session::CookieStore, key: "_interslice_session"
+
+    config.middleware.use ::ExceptionMiddleware
   end
 end
