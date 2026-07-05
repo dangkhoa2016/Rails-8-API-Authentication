@@ -1,25 +1,40 @@
-
-
 # Rails 8 API Authentication with JWT
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+> 🌐 Language / Ngôn ngữ: **English** | [Tiếng Việt](README.vi.md)
 
 This project is a Rails 8 API authentication service built with Devise and JWT. It supports registration, email confirmation, sign in, sign out, profile lookup, and user-management operations with admin-only access controls.
 
 ## Features
 
 - User registration with email confirmation.
-- JWT-based sign in and sign out.
+- JWT-based sign in and sign out with token revocation via denylist.
 - Profile lookup with token metadata.
 - Self-service account update and account deletion.
-- Admin-only user listing, user creation, role updates, and user deletion.
-- Basic CI with Brakeman, RuboCop, and Rails tests.
+- User active/inactive status — deactivated accounts are automatically blocked from signing in.
+- Admin-only user listing, user creation, role updates, user deletion, account status toggling (lock/unlock), and email force-confirmation.
+- Rate limiting on sign-in, registration, and password-reset endpoints.
+- JWT denylist cleanup via job/task support.
+- Docker + Kamal deployment scaffolding with a health check endpoint.
+- CI with Brakeman, RuboCop, the full Rails test suite, and a dedicated auth regression job.
 
-## Stack
+## Technologies Used
 
-- Rails 8
-- Devise
-- devise-jwt
-- SQLite
-- Docker + Kamal deployment scaffolding
+- **Rails 8** — Full-featured MVC framework
+- **Devise** — Flexible authentication solution
+- **devise-jwt** — JWT token authentication for Devise
+- **Puma** — Application web server
+- **SQLite** — Database
+- **Solid Cache**, **Solid Queue**, **Solid Cable** — Rails 8 default adapters
+- **Rack::CORS** — Cross-Origin Resource Sharing
+- **Rack::Attack** — Rate limiting on auth endpoints
+- **Docker + Kamal** — Containerized deployment
+- **Thruster** — Asset caching and X-Sendfile acceleration
+- **dotenv** — Environment variable management
+- **Brakeman** — Static security analysis
+- **RuboCop** — Linting and style enforcement
+- **SimpleCov** — Code coverage
 
 ## Quick Start
 
@@ -35,26 +50,94 @@ bin/setup
 bin/dev
 ```
 
-3. Call the API on `http://localhost:4000`.
+3. Call the API on `http://localhost:4000` by default. If you set `PORT` in your shell or `.env`, use that value instead.
 
-4. Use the scripts in `manual/` as runnable request examples:
+4. Use the snippets in `manual/` as copy/paste references for auth and user-management requests:
 
 - `manual/registration.sh`
 - `manual/session.sh`
+- `manual/password.sh`
 - `manual/user.sh`
+
+## Local Auth Quick Start
+
+This flow is intended for a clean local checkout and matches the routes covered by the auth integration tests.
+
+1. Start the app with `bin/dev` and keep it running on `http://localhost:4000` unless you have overridden `PORT`.
+
+2. Register a new user in a separate terminal.
+
+```bash
+curl -sS -X POST http://localhost:4000/users \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user": {
+      "email": "user@example.com",
+      "password": "password",
+      "password_confirmation": "password"
+    }
+  }' | jq .
+```
+
+3. Fetch the confirmation token from the local database.
+
+```bash
+bin/rails runner 'puts User.find_by!(email: "user@example.com").confirmation_token'
+```
+
+4. Confirm the account.
+
+```bash
+curl -sS "http://localhost:4000/users/confirmation?confirmation_token=<token>" | jq .
+```
+
+5. Sign in and capture the JWT from the `Authorization` response header.
+
+```bash
+TOKEN=$(curl -is -X POST http://localhost:4000/users/sign_in \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user": {
+      "email": "user@example.com",
+      "password": "password"
+    }
+  }' | sed -n 's/^authorization: Bearer //p' | tr -d '\r')
+```
+
+6. Read the primary profile endpoint with that JWT.
+
+```bash
+curl -sS http://localhost:4000/user/profile \
+  -H "Authorization: Bearer ${TOKEN}" | jq .
+```
+
+7. Sign out and revoke the token.
+
+```bash
+curl -sS -X DELETE http://localhost:4000/users/sign_out \
+  -H "Authorization: Bearer ${TOKEN}" | jq .
+```
+
+8. Optionally inspect the broader request references in `manual/session.sh`, `manual/registration.sh`, `manual/password.sh`, and `manual/user.sh` for invalid-token, expired-token, password-reset, and admin/user-management examples.
 
 ## Environment
 
-The sample environment file currently contains the minimum local settings:
+Copy `.env.sample` to `.env` for local development:
 
-```env
-RAILS_LOG_TO_STDOUT=true
-RAILS_ENV=development
-PORT=4000
-RAILS_MAX_THREADS=1
+```bash
+cp .env.sample .env
 ```
 
-If you do not set `PORT`, `bin/dev` boots on `4000` locally.
+Minimum required settings for local development:
+
+```env
+RAILS_ENV=development
+RAILS_LOG_TO_STDOUT=true
+PORT=4000
+RAILS_MAX_THREADS=3
+```
+
+If you do not set `PORT`, `bin/dev` boots on `4000` locally. The full variable reference — including production secrets, Puma concurrency, mailer, admin seed, CORS, and the manual JWT token slot — is documented in `.env.sample`.
 
 ## Code Coverage
 
@@ -64,7 +147,9 @@ Generate a coverage report locally with SimpleCov by running the test suite with
 COVERAGE=1 bin/rails test
 ```
 
-The report is written to `public/coverage`. While the Rails server is running in development, open `http://localhost:4000/coverage` to view the latest generated report. This route is development-only and simply redirects to the static HTML report.
+When `COVERAGE=1` is set, the test suite runs without Rails parallel workers so the SimpleCov report stays accurate.
+
+The report is written to `public/coverage`. While the Rails server is running in development, open `http://localhost:4000/coverage` to view the latest generated report. This development-only endpoint redirects to the static HTML report.
 
 Internally, the app redirects `/coverage` to `/coverage/` before the static file server handles the request. The trailing slash matters because the generated SimpleCov HTML references assets with relative paths such as `./assets/...`.
 
@@ -80,6 +165,8 @@ The route contract below reflects `config/routes.rb` and the current controller 
 | POST | `/users/sign_in` | Sign in and receive JWT in the `Authorization` response header |
 | DELETE | `/users/sign_out` | Sign out and revoke the current token |
 | GET | `/users/confirmation` | Confirm email via Devise confirmable flow |
+| POST | `/users/password` | Send password reset instructions |
+| PUT/PATCH | `/users/password` | Reset password with a token |
 | PUT/PATCH | `/users` | Update the current signed-in account |
 | DELETE | `/users` | Delete the current signed-in account |
 
@@ -100,6 +187,14 @@ The route contract below reflects `config/routes.rb` and the current controller 
 | GET | `/users/:id` | View a user; admin or self |
 | PUT | `/users/:id` | Update a user; admin or self |
 | DELETE | `/users/:id` | Delete a user; admin or self |
+
+### Utility Routes
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/` | Root welcome endpoint |
+| GET | `/home` | Welcome endpoint alias |
+| GET | `/up` | Health check for uptime/load balancers |
 
 ## Request Format Notes
 
@@ -183,10 +278,11 @@ curl -X DELETE http://localhost:4000/users/sign_out \
 
 ## Manual References
 
-The scripts below currently reflect the implementation more accurately than the original README examples:
+The files below currently reflect the implementation more accurately than the original README examples, but they include sample output blocks and should be treated as reference notes rather than shell scripts you execute verbatim:
 
 - [manual/registration.sh](./manual/registration.sh)
 - [manual/session.sh](./manual/session.sh)
+- [manual/password.sh](./manual/password.sh)
 - [manual/user.sh](./manual/user.sh)
 
 ## Improvement Planning
@@ -199,4 +295,6 @@ Project improvement artifacts are tracked in:
 ## License
 
 This project is licensed under the MIT License.
+
+See the [LICENSE](LICENSE) file for details.
 
