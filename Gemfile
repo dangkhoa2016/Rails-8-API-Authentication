@@ -49,6 +49,9 @@ gem "tsort"
 # Rails 8.0.1 is not compatible with minitest 6
 gem "minitest", "< 6"
 
+# Pin rdoc to match system version (7.2.0) to avoid double-load warnings
+gem "rdoc", "~> 7.2"
+
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"
