@@ -3,6 +3,7 @@
 [![Ruby 3.x](https://img.shields.io/badge/Ruby-3.x-red?style=flat&logo=ruby&logoColor=white)](https://www.ruby-lang.org/)
 [![Ruby 4.x](https://img.shields.io/badge/Ruby-4.x-red?style=flat&logo=ruby&logoColor=white)](https://www.ruby-lang.org/)
 [![Rails 8.1.3](https://img.shields.io/badge/Rails-8.1.3-CC0000?logo=rubyonrails&logoColor=white)](https://rubyonrails.org/)
+[![CI](https://github.com/dangkhoa2016/Rails-8-API-Authentication/actions/workflows/ci.yml/badge.svg)](https://github.com/dangkhoa2016/Rails-8-API-Authentication/actions/workflows/ci.yml)
 [![CircleCI](https://dl.circleci.com/status-badge/img/gh/dangkhoa2016/Rails-8-API-Authentication/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/dangkhoa2016/Rails-8-API-Authentication/tree/main)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -19,7 +20,7 @@ Dự án này là một dịch vụ xác thực API Rails 8 được xây dựng
 - Trạng thái hoạt động/không hoạt động của người dùng — tài khoản bị vô hiệu hóa sẽ tự động bị chặn đăng nhập.
 - Các chức năng chỉ dành cho admin: danh sách người dùng, tạo người dùng, quản lý vai trò, xóa người dùng, bật/tắt trạng thái tài khoản (khóa/mở khóa), và xác nhận email từ admin.
 - Giới hạn tần suất truy cập (rate limiting) cho các endpoint đăng nhập, đăng ký, và reset mật khẩu (rack-attack).
-- Dọn dẹp denylist JWT bằng job/task.
+- Dọn dẹp denylist JWT bằng Active Job và Rake task.
 - Triển khai với Docker + Kamal, có health check cho container.
 - CI với Brakeman, RuboCop, toàn bộ test suite của Rails, và một job riêng cho regression test của auth.
 
@@ -133,7 +134,7 @@ Sao chép `.env.sample` thành `.env` cho môi trường local:
 cp .env.sample .env
 ```
 
-Các cấu hình tối thiểu cần thiết:
+Các cấu hình đề xuất cho môi trường local:
 
 ```env
 RAILS_ENV=development
@@ -320,6 +321,12 @@ Các file theo dõi cải tiến của dự án được liệt kê dưới đâ
 
 - [manual/PROJECT_IMPROVEMENT_REPORT.md](./manual/PROJECT_IMPROVEMENT_REPORT.md)
 - [manual/IMPLEMENTATION_TRACKER.md](./manual/IMPLEMENTATION_TRACKER.md)
+
+## Dự án liên quan
+
+Dự án này có một phiên bản Node.js triển khai các khái niệm xác thực tương tự (JWT, kiểm soát truy cập theo vai trò, thu hồi token) trên một stack khác:
+
+- **[dangkhoa2016/Nodejs-API-Authentication](https://github.com/dangkhoa2016/Nodejs-API-Authentication)** — Một REST API sẵn sàng cho production dành cho xác thực và quản lý người dùng, được xây dựng bằng **Hono**, **Sequelize**, **bcryptjs**, **JWT**, và **SQLite** (dev) / **Postgres** (prod).
 
 ## License
 
