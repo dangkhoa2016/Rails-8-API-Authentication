@@ -1,0 +1,88 @@
+# CircleCI configuration (optional — not required for CI)
+version: 2.1
+
+# Define the execution environment with parameterized Ruby version
+executors:
+  rails-env:
+    parameters:
+      ruby-version:
+        type: string
+    docker:
+      - image: cimg/ruby:<< parameters.ruby-version >>
+        environment:
+          RAILS_ENV: test
+          RAILS_MASTER_KEY: ${RAILS_MASTER_KEY}
+
+jobs:
+  build_and_test:
+    parameters:
+      ruby-version:
+        type: string
+    executor:
+      name: rails-env
+      ruby-version: << parameters.ruby-version >>
+    steps:
+      # 1. Check out the source code
+      - checkout
+
+      # 2. Install required system dependencies (Fixes the libvips LoadError)
+      - run:
+          name: "Install system dependencies"
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y libvips sqlite3
+
+      # 3. Restore cached gems to speed up the build process
+      - restore_cache:
+          keys:
+            - v1-gem-cache-<< parameters.ruby-version >>-{{ checksum "Gemfile" }}
+            - v1-gem-cache-<< parameters.ruby-version >>-
+
+      # 4. Install Ruby gems
+      - run:
+          name: "Install Ruby dependencies"
+          command: |
+            gem install bundler
+            bundle config set --local path 'vendor/bundle'
+            bundle install
+
+      # 5. Save gems to cache for future builds
+      - save_cache:
+          paths:
+            - ./vendor/bundle
+          key: v1-gem-cache-<< parameters.ruby-version >>-{{ checksum "Gemfile" }}
+
+      # 6. Set up the test database (SQLite by default for Rails 8)
+      - run:
+          name: "Database setup"
+          command: bundle exec rails db:test:prepare
+
+      # 7. Scan for common Rails security vulnerabilities
+      - run:
+          name: "Scan for common Rails security vulnerabilities"
+          command: bin/brakeman --no-pager
+
+      # 8. Lint code for consistent style
+      - run:
+          name: "Lint code for consistent style"
+          command: bin/rubocop
+
+      # 9. Run the test suite with coverage enabled
+      - run:
+          name: "Run tests with coverage"
+          command: COVERAGE=1 bundle exec rails test
+
+      # 10. Store the generated SimpleCov coverage report as an artifact
+      - store_artifacts:
+          path: public/coverage
+          destination: coverage-report-ruby-<< parameters.ruby-version >>
+
+# Define the workflow to orchestrate job execution
+workflows:
+  version: 2
+  test_app_workflow:
+    jobs:
+      - build_and_test:
+          matrix:
+            parameters:
+              ruby-version: ["3.2", "3.3", "4.0"]
