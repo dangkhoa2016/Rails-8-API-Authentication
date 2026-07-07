@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "net/smtp"
+
 class User < ApplicationRecord
   # Include default devise modules. Others available are:
   # :omniauthable
@@ -10,7 +12,7 @@ class User < ApplicationRecord
          :jwt_authenticatable, jwt_revocation_strategy: JwtDenylist
 
   validates :password, format: {
-    with: /\A(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+    with: /\A(?=.*[a-z])(?=.*[A-Z])(?=.*\d).*\z/,
     message: "must include at least 1 uppercase letter, 1 lowercase letter, and 1 number"
   }, if: :password_required?
 
@@ -28,26 +30,37 @@ class User < ApplicationRecord
   attr_accessor :token_info
   enum :role, { user: "user", admin: "admin" }
 
+  def active_for_authentication?
+    super && active?
+  end
+
+  def inactive_message
+    active? ? super : :account_inactive
+  end
+
   def on_jwt_dispatch(token, payload)
     # puts "on_jwt_dispatch: #{token}, #{payload}"
     self.token_info = { token: token, payload: payload }
   end
 
   def serializable_hash(options = nil)
-    result = super
-
-    if unconfirmed_email.present?
-      result[:unconfirmed_email] = unconfirmed_email
-    end
-
+    opts = (options || {}).merge(except: SENSITIVE_FIELDS)
+    result = super(opts)
+    result[:unconfirmed_email] = unconfirmed_email if unconfirmed_email.present?
     result
   end
 
   def send_confirmation_instructions
     super
-  rescue StandardError => e
-    Rails.logger.error "Error sending confirmation instructions: #{e}"
+  rescue Net::SMTPError, Net::OpenTimeout, Net::ReadTimeout => e
+    Rails.logger.error "Failed to send confirmation instructions to #{email}: #{e.class} - #{e.message}"
   end
+
+  SENSITIVE_FIELDS = %w[
+    encrypted_password reset_password_token reset_password_sent_at
+    confirmation_token unlock_token failed_attempts locked_at
+    remember_created_at current_sign_in_ip last_sign_in_ip
+  ].freeze
 
   private
 
