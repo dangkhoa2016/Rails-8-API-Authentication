@@ -10,16 +10,50 @@ class AccountManagementTest < ActionDispatch::IntegrationTest
   test "registration returns validation errors for duplicate email" do
     existing_user = confirmed_user("duplicate-registration@example.local")
 
+    assert_no_difference("User.count") do
+      post "/users", params: {
+        user: {
+          email: existing_user.email,
+          username: "different_username",
+          password: "Password1!",
+          password_confirmation: "Password1!"
+        }
+      }, as: :json
+    end
+
+    assert_response :unprocessable_entity
+    assert_includes json_response.fetch("errors"), "Email has already been taken"
+  end
+
+  test "registration returns validation errors for duplicate username" do
+    existing_user = confirmed_user("duplicate-username@example.local", username: "duplicate_username")
+
     post "/users", params: {
       user: {
-        email: existing_user.email,
-        password: "password",
-        password_confirmation: "password"
+        email: "another-user@example.local",
+        username: existing_user.username,
+        password: "Password1!",
+        password_confirmation: "Password1!"
       }
     }, as: :json
 
     assert_response :unprocessable_entity
-    assert_includes json_response.fetch("errors"), "Email has already been taken"
+    assert_includes json_response.fetch("errors"), "Username has already been taken"
+  end
+
+  test "registration without username creates user successfully" do
+    assert_difference("User.count", 1) do
+      post "/users", params: {
+        user: {
+          email: "no-username@example.local",
+          password: "Password1!",
+          password_confirmation: "Password1!"
+        }
+      }, as: :json
+    end
+
+    assert_response :success
+    assert_nil User.find_by(email: "no-username@example.local").username
   end
 
   test "signed in user can update account with current password" do
@@ -29,7 +63,7 @@ class AccountManagementTest < ActionDispatch::IntegrationTest
     put "/users", params: {
       user: {
         first_name: "Updated",
-        current_password: "password"
+        current_password: "Password1!"
       }
     }, as: :json
 
@@ -40,7 +74,7 @@ class AccountManagementTest < ActionDispatch::IntegrationTest
   end
 
   test "signed in user sees validation errors when current password is missing" do
-    user = confirmed_user("account-update-missing-password@example.local", username: "account_update_missing_password")
+    user = confirmed_user("account-update-missing-password@example.local", username: "update_missing_password")
     sign_in user
 
     put "/users", params: {
@@ -109,7 +143,7 @@ class AccountManagementTest < ActionDispatch::IntegrationTest
   end
 
   test "user sees password reset errors with invalid token" do
-    user = confirmed_user("password-reset-invalid@example.local", username: "password_reset_invalid_user")
+    user = confirmed_user("password-reset-invalid@example.local", username: "pw_reset_invalid_user")
 
     put "/users/password", params: {
       user: {

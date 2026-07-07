@@ -1,0 +1,44 @@
+# frozen_string_literal: true
+
+require "test_helper"
+
+class CleanExpiredJwtDenylistsJobTest < ActiveJob::TestCase
+  test "uses the background queue" do
+    assert_equal "background", CleanExpiredJwtDenylistsJob.queue_name
+  end
+
+  test "deletes expired records and logs the count" do
+    JwtDenylist.delete_all
+
+    expired = JwtDenylist.create!(jti: "expired-job-jti", exp: 2.hours.ago)
+    active = JwtDenylist.create!(jti: "active-job-jti", exp: 2.hours.from_now)
+    logger = Class.new {
+      attr_reader :messages
+
+      def initialize
+        @messages = []
+      end
+
+      def info(message)
+        @messages << message
+        nil
+      end
+    }.new
+
+    Rails.stub(:logger, logger) do
+      CleanExpiredJwtDenylistsJob.perform_now
+    end
+
+    assert_not JwtDenylist.exists?(expired.id)
+    assert JwtDenylist.exists?(active.id)
+    assert_includes logger.messages, "[CleanExpiredJwtDenylistsJob] Deleted 1 expired JWT denylist entries"
+  end
+
+  test "job is configured in recurring.yml" do
+    recurring = YAML.load_file(Rails.root.join("config/recurring.yml"))
+    production_config = recurring["production"]
+    assert production_config, "No production config found in recurring.yml"
+    assert production_config.dig("clean_expired_jwt_denylists", "class"), "Job class not configured"
+    assert production_config.dig("clean_expired_jwt_denylists", "schedule"), "Schedule not configured"
+  end
+end

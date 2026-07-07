@@ -31,35 +31,6 @@ end
 class ApplicationControllerTest < ActiveSupport::TestCase
   include Devise::Test::IntegrationHelpers
 
-  def confirmed_user(email, password: "password", **attributes)
-    base = email.split("@").first.gsub(/[^\w]/, "_")
-    suffix = "_#{SecureRandom.hex(2)}"
-    max_base = 25 - suffix.length
-    attributes[:username] ||= base.length > max_base ? base[0, max_base] + suffix : base + suffix
-    User.create!(
-      {
-        email: email,
-        password: password,
-        password_confirmation: password,
-        confirmed_at: Time.current
-      }.merge(attributes)
-    )
-  end
-
-  def jwt_auth_headers_for(user, headers = { "Accept" => "application/json", "Content-Type" => "application/json" })
-    Devise::JWT::TestHelpers.auth_headers(headers, user)
-  end
-
-  def decode_jwt(token)
-    payload, = JWT.decode(
-      token,
-      Warden::JWTAuth.config.secret,
-      true,
-      algorithm: Warden::JWTAuth.config.algorithm
-    )
-    payload
-  end
-
   test "JWT decode errors return 401" do
     controller = TestErrorsController.new
     logger = Class.new do

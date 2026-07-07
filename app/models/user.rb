@@ -14,7 +14,16 @@ class User < ApplicationRecord
     message: "must include at least 1 uppercase letter, 1 lowercase letter, and 1 number"
   }, if: :password_required?
 
-  validates :username, uniqueness: true, allow_blank: true
+  before_validation :normalize_username
+
+  validates :username, uniqueness: { allow_nil: true },
+                       length: { in: 3..25, allow_nil: true },
+                       format: { with: /\A[a-zA-Z0-9_-]+\z/, allow_nil: true }
+
+  def self.find_for_database_authentication(conditions)
+    value = conditions[:email].to_s.downcase
+    find_by(email: value) || find_by(username: value)
+  end
 
   attr_accessor :token_info
   enum :role, { user: "user", admin: "admin" }
@@ -41,6 +50,10 @@ class User < ApplicationRecord
   end
 
   private
+
+  def normalize_username
+    self.username = username.to_s.gsub(/\s+/, "").downcase.presence
+  end
 
   def password_required?
     new_record? || password.present?

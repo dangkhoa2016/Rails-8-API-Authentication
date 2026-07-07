@@ -2,23 +2,31 @@
 
 if ENV["COVERAGE"]
   require "simplecov"
-  require 'simplecov-console'
+  require "simplecov-console"
   SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter.new([
     SimpleCov::Formatter::HTMLFormatter,
-    SimpleCov::Formatter::Console,
+    SimpleCov::Formatter::Console
   ])
 
   SimpleCov.start "rails" do
     coverage_dir "public/coverage"
-    add_filter "/test/"
-    add_filter "/config/"
-    add_filter "/vendor/"
+    # SimpleCov 1.x uses `skip`, 0.x uses `add_filter`
+    if respond_to?(:add_filter)
+      add_filter "/test/"
+      add_filter "/config/"
+      add_filter "/vendor/"
+    else
+      skip "/test/"
+      skip "/config/"
+      skip "/vendor/"
+    end
   end
 end
 
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
+require "minitest/mock"
 require "cgi"
 require "devise"
 require "devise/jwt/test_helpers"
@@ -27,12 +35,16 @@ require "securerandom"
 module ActiveSupport
   class TestCase
     # Run tests in parallel with specified workers
-    parallelize(workers: :number_of_processors)
+    parallelize(workers: :number_of_processors) unless ENV["COVERAGE"]
 
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
     fixtures :all
 
     def confirmed_user(email, password: "Password1!", **attributes)
+      base = email.split("@").first.gsub(/[^\w]/, "_")
+      suffix = "_#{SecureRandom.hex(2)}"
+      max_base = 25 - suffix.length
+      attributes[:username] ||= base.length > max_base ? base[0, max_base] + suffix : base + suffix
       User.create!(
         {
           email: email,
