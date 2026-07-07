@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 Rails.application.routes.draw do
+  resources :home, only: [ :index ]
+
   devise_for :users, defaults: { format: :json }, controllers: {
     sessions: "users/sessions",
     registrations: "users/registrations",
@@ -21,7 +23,7 @@ Rails.application.routes.draw do
   get "up" => "rails/health#show", as: :rails_health_check
 
   # Defines the root path route ("/")
-  # root "posts#index"
+  root "home#index"
 
   match "*path", to: "application#route_not_found", via: :all
 end
