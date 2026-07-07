@@ -59,6 +59,9 @@ jobs:
           ruby-version: .ruby-version
           bundler-cache: true
 
+      - name: Set RAILS_MASTER_KEY from GitHub Secrets
+        run: echo "RAILS_MASTER_KEY=${{ secrets.RAILS_MASTER_KEY }}" >> $GITHUB_ENV
+
       - name: Run tests
         env:
           RAILS_ENV: test
