@@ -8,13 +8,18 @@ class UsersController < ApplicationController
   # in UserAccessControl concern (only update/destroy/show are allowed).
 
   before_action :authorize_user_access
-  before_action :find_user, only: %i[show update destroy]
+  before_action :find_user, only: %i[show update destroy toggle_status confirm_by_admin]
 
   # GET /users
   def index
     per_page = (params[:per_page] || 20).to_i
     per_page = [ per_page, 100 ].min
-    @pagy, @users = pagy(:offset, User.all, limit: per_page, client_max_limit: 100)
+    safe_columns = %i[id email username first_name last_name role active confirmed_at created_at unconfirmed_email]
+    @pagy, @users = pagy(
+      User.select(*safe_columns),
+      limit: per_page,
+      client_max_limit: 100
+    )
     render json: {
       users: @users,
       meta: pagy_metadata(@pagy)
@@ -58,10 +63,49 @@ class UsersController < ApplicationController
     end
   end
 
+  # PUT /users/{id}/status
+  def toggle_status
+    active_value = parse_boolean(params.dig(:user, :active))
+
+    if active_value.nil?
+      return render json: { error: "active must be a boolean" }, status: :unprocessable_entity
+    end
+
+    if @user.update(active: active_value)
+      render json: @user, status: :ok
+    else
+      render json: { errors: @user.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
+  # PUT /users/{id}/confirm_by_admin
+  def confirm_by_admin
+    if @user.update(confirmed_at: Time.current, active: true)
+      render json: @user, status: :ok
+    else
+      render json: { errors: @user.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
   private
 
   def find_user
-    @user = User.find_by_id!(params[:id])
+    @user = if (id = Integer(params[:id], exception: false))
+      User.find(id)
+    else
+      User.find_by!("email = :val OR username = :val", val: params[:id])
+    end
+  end
+
+  def parse_boolean(value)
+    case value.to_s.strip.downcase
+    when "true", "yes", "y", "1", "t"
+      true
+    when "false", "no", "n", "0", "f"
+      false
+    else
+      nil
+    end
   end
 
   def user_params
@@ -73,7 +117,9 @@ class UsersController < ApplicationController
 
     if current_user.admin?
       role = params.dig(:user, :role)
-      filtered_params[:role] = role if role.present?
+      filtered_params[:role] = role if role.present? && User.roles.key?(role)
+      active_value = params.dig(:user, :active)
+      filtered_params[:active] = parse_boolean(active_value) unless active_value.nil?
     end
 
     filtered_params
