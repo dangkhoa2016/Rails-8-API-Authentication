@@ -3,13 +3,22 @@
 class UsersController < ApplicationController
   include UserAccessControl
 
+  # NOTE: index and create are implicitly admin-only.
+  # Non-admin users are rejected by admin_or_current_user?
+  # in UserAccessControl concern (only update/destroy/show are allowed).
+
   before_action :authorize_user_access
   before_action :find_user, only: %i[show update destroy]
 
   # GET /users
   def index
-    @users = User.all
-    render json: @users, status: :ok
+    per_page = (params[:per_page] || 20).to_i
+    per_page = [ per_page, 100 ].min
+    @pagy, @users = pagy(:offset, User.all, limit: per_page, client_max_limit: 100)
+    render json: {
+      users: @users,
+      meta: pagy_metadata(@pagy)
+    }, status: :ok
   end
 
   # GET /users/{username}
