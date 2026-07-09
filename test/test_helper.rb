@@ -1,5 +1,21 @@
 # frozen_string_literal: true
 
+if ENV["COVERAGE"]
+  require "simplecov"
+  require 'simplecov-console'
+  SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter.new([
+    SimpleCov::Formatter::HTMLFormatter,
+    SimpleCov::Formatter::Console,
+  ])
+
+  SimpleCov.start "rails" do
+    coverage_dir "public/coverage"
+    add_filter "/test/"
+    add_filter "/config/"
+    add_filter "/vendor/"
+  end
+end
+
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
