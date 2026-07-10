@@ -11,7 +11,7 @@ Bundler.require(*Rails.groups)
 module Rails8ApiAuthentication
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
-    config.load_defaults 8.0
+    config.load_defaults 8.1
 
     # Please, add to the `config` `ignore` list any files that are not Ruby
     # files, so that Rails does not add `.rb` extensions to them.
