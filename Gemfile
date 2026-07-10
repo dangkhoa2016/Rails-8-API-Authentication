@@ -1,5 +1,7 @@
 source "https://rubygems.org"
 
+ruby_version = Gem::Version.new(RUBY_VERSION)
+
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem "rails", "~> 8.1.3"
 # Use sqlite3 as the database for Active Record
@@ -18,11 +20,19 @@ gem "tzinfo-data", platforms: %i[ windows jruby ]
 # Use the database-backed adapters for Rails.cache, Active Job, and Action Cable
 gem "solid_cache"
 gem "solid_queue"
-gem "solid_cable"
+# solid_cable >= 4.0 requires Ruby >= 3.3
+# WARNING: String comparison is lexicographic, not numeric.
+# Safe for current versions (3.2, 3.3) but will break if
+# Ruby releases 3.10+ (string "3.10" > "3.3" is false).
+if ruby_version < Gem::Version.new("3.3")
+  gem "solid_cable", "< 4.0"
+else
+  gem "solid_cable"
+end
 
 # Reduces boot times through caching; required in config/boot.rb
 # bootsnap >= 1.20 compiles native extensions requiring Ruby 4.0+ APIs
-if RUBY_VERSION < "4"
+if ruby_version < Gem::Version.new("4")
   gem "bootsnap", "~> 1.18.0", require: false
 else
   gem "bootsnap", require: false
@@ -40,14 +50,38 @@ gem "thruster", require: false
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
 # gem "rack-cors"
 
-# Required for Ruby 4.0+ as cgi was removed from default gems
-gem "cgi"
+# Ruby 4.x only — these gems are no longer in Ruby's default set
+if ruby_version >= Gem::Version.new("4")
+  gem "cgi"      # extracted from stdlib in Ruby 4
+  gem "tsort"    # removed from default gems in Ruby 4
+# Ruby 3.x compatibility pins — newer versions of these gems require Ruby >= 3.3
+else
+  gem "dry-auto_inject", "< 1.2"
+  gem "dry-configurable", "< 1.4"
+  gem "parallel", "< 2.0"
+end
 
-# Required for Ruby 4.1+ as tsort will be removed from default gems
-gem "tsort"
-
-# Rails 8.0.1 is not compatible with minitest 6
-gem "minitest", "< 6"
+# Minitest version depends on Rails version
+# Rails 8.0 is not compatible with minitest 6
+# Rails 8.1+ supports minitest 6 (with minitest-mock for Minitest::Mock)
+#
+# Parse our own Gemfile to find the Rails constraint instead of using
+# Gem::Specification.find_by_name which behaves differently at
+# `bundle install` vs `bundle exec` time.
+rails_version_line = File.read(__FILE__).match(/^gem "rails", "([^"]+)"/)
+rails_version = if rails_version_line
+                # Extract major.minor from constraint like "~> 8.1.3" or ">= 8.0"
+                major_minor = rails_version_line[1].match(/(\d+\.\d+)/)
+                major_minor ? Gem::Version.new(major_minor[1]) : Gem::Version.new("8.0")
+else
+                Gem::Version.new("8.0")
+end
+if rails_version < Gem::Version.new("8.1")
+  gem "minitest", "~> 5.27"
+else
+  gem "minitest", "~> 6.0"
+  gem "minitest-mock"
+end
 
 # Pin rdoc to avoid double-load warnings
 gem "rdoc", "~> 8.0"
@@ -61,6 +95,7 @@ group :development, :test do
 
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
+
 end
 
 
