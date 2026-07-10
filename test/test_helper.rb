@@ -10,9 +10,16 @@ if ENV["COVERAGE"]
 
   SimpleCov.start "rails" do
     coverage_dir "public/coverage"
-    add_filter "/test/"
-    add_filter "/config/"
-    add_filter "/vendor/"
+    # SimpleCov 1.x uses `skip`, 0.x uses `add_filter`
+    if respond_to?(:add_filter)
+      add_filter "/test/"
+      add_filter "/config/"
+      add_filter "/vendor/"
+    else
+      skip "/test/"
+      skip "/config/"
+      skip "/vendor/"
+    end
   end
 end
 
@@ -78,7 +85,10 @@ class ActionDispatch::IntegrationTest
   end
 
   def confirmed_user(email, password: "password", **attributes)
-    attributes[:username] ||= email.split("@").first.gsub(/[^\w]/, "_") + "_#{SecureRandom.hex(4)}"
+    base = email.split("@").first.gsub(/[^\w]/, "_")
+    suffix = "_#{SecureRandom.hex(2)}"
+    max_base = 25 - suffix.length
+    attributes[:username] ||= base.length > max_base ? base[0, max_base] + suffix : base + suffix
     User.create!(
       {
         email: email,
