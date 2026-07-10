@@ -32,7 +32,7 @@ class ApplicationController < ActionController::API
 
    # Handle internal errors
    def handle_internal_error(exception)
-    logger.error "Internal error: #{exception.message}", exception.backtrace.join("\n")
+    logger.error "Internal error: #{exception.message}\n#{exception.backtrace.join("\n")}"
     render json: { error: I18n.translate("errors.internal_error") }, status: 500
   end
 
