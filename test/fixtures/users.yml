@@ -15,3 +15,10 @@ two:
   username: 'user2'
   first_name: 'User'
   last_name: 'Two'
+
+admin:
+  email: 'admin@local.test'
+  username: 'admin_user'
+  role: 'admin'
+  confirmed_at: <%= Time.now %>
+  encrypted_password: <%= Devise::Encryptor.digest(User, 'password') %>
