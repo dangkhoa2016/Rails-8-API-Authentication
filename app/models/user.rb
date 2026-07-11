@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "net/smtp"
+
 class User < ApplicationRecord
   # Include default devise modules. Others available are:
   # :omniauthable
@@ -23,6 +25,14 @@ class User < ApplicationRecord
   attr_accessor :token_info
   enum :role, { user: "user", admin: "admin" }
 
+  def active_for_authentication?
+    super && active?
+  end
+
+  def inactive_message
+    active? ? super : :account_inactive
+  end
+
   def on_jwt_dispatch(token, payload)
     # puts "on_jwt_dispatch: #{token}, #{payload}"
     self.token_info = { token: token, payload: payload }
@@ -40,8 +50,8 @@ class User < ApplicationRecord
 
   def send_confirmation_instructions
     super
-  rescue StandardError => e
-    Rails.logger.error "Error sending confirmation instructions: #{e}"
+  rescue Net::SMTPError, Net::OpenTimeout, Net::ReadTimeout => e
+    Rails.logger.error "Failed to send confirmation instructions to #{email}: #{e.class} - #{e.message}"
   end
 
   private

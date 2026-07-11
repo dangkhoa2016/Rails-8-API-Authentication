@@ -40,7 +40,7 @@ gem "thruster", require: false
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
 gem "rack-cors"
 
-# Required for Ruby 4.0+ as cgi was removed from default gems
+# Required for Ruby 4.0 compatibility as cgi was removed from default gems (cgi/cookie extracted from stdlib)
 gem "cgi"
 
 # Required for Ruby 4.1+ as tsort will be removed from default gems
