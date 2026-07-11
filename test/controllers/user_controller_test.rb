@@ -140,4 +140,235 @@ class UserControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert_not_nil json_response["errors"]
   end
+
+  # --- Unauthenticated access ---
+
+  test "unauthenticated user cannot access users index" do
+    sign_out @user
+    get users_url, as: :json
+    assert_response :unauthorized
+  end
+
+  test "unauthenticated user cannot create user" do
+    sign_out @user
+    post users_create_url, params: {
+      user: { email: "new@user.local", username: "new_user", password: "password" }
+    }, as: :json
+    assert_response :unauthorized
+  end
+
+  test "unauthenticated user cannot toggle status" do
+    sign_out @user
+    put "/users/#{@user_test.id}/status", params: { user: { active: false } }, as: :json
+    assert_response :unauthorized
+  end
+
+  test "unauthenticated user cannot confirm by admin" do
+    sign_out @user
+    put "/users/#{@user_test.id}/confirm_by_admin", as: :json
+    assert_response :unauthorized
+  end
+
+  # --- Non-admin access to existing actions ---
+
+  test "non-admin cannot create user" do
+    sign_out @user
+    regular = confirmed_user("reg_create@example.local", role: "user",
+                            confirmed_at: Time.current)
+    sign_in regular
+
+    post users_create_url, params: {
+      user: { email: "new@user.local", username: "new_user", password: "password" }
+    }, as: :json
+    assert_response :unauthorized
+  end
+
+  test "non-admin cannot show another user" do
+    sign_out @user
+    regular = confirmed_user("reg_show@example.local", role: "user",
+                            confirmed_at: Time.current)
+    sign_in regular
+
+    get user_url(@user_test), as: :json
+    assert_response :unauthorized
+  end
+
+  test "non-admin cannot update another user" do
+    sign_out @user
+    regular = confirmed_user("reg_update@example.local", role: "user",
+                            confirmed_at: Time.current)
+    sign_in regular
+
+    put user_url(@user_test), params: { user: { first_name: "Hacked" } }, as: :json
+    assert_response :unauthorized
+  end
+
+  # --- Admin permitted params ---
+
+  test "admin can create user with role" do
+    post users_create_url, params: {
+      user: {
+        email: "admin_created@example.local",
+        username: "admin_created",
+        password: "password",
+        role: "admin"
+      }
+    }, as: :json
+
+    assert_response :created
+    assert_equal "admin", User.find_by(email: "admin_created@example.local").role
+  end
+
+  test "admin can update user active status via update endpoint" do
+    put user_url(@user_test), params: { user: { active: false } }, as: :json
+    assert_response :success
+    @user_test.reload
+    assert_not @user_test.active
+  end
+
+  # --- toggle_status ---
+
+  test "admin can deactivate a user" do
+    put "/users/#{@user_test.id}/status", params: { user: { active: false } }, as: :json
+    assert_response :success
+    @user_test.reload
+    assert_not @user_test.active
+  end
+
+  test "admin can reactivate a user" do
+    @user_test.update!(active: false)
+    put "/users/#{@user_test.id}/status", params: { user: { active: true } }, as: :json
+    assert_response :success
+    @user_test.reload
+    assert @user_test.active
+  end
+
+  test "non-admin cannot toggle status" do
+    sign_out @user
+    regular = confirmed_user("reg_toggle@example.local", role: "user",
+                            confirmed_at: Time.current)
+    sign_in regular
+
+    put "/users/#{@user_test.id}/status", params: { user: { active: false } }, as: :json
+    assert_response :unauthorized
+  end
+
+  test "toggle_status returns not found for missing numeric id" do
+    put "/users/999999/status", params: { user: { active: false } }, as: :json
+    assert_response :not_found
+  end
+
+  test "toggle_status finds user by email" do
+    put "/users/#{@user_test.email}/status", params: { user: { active: false } }, as: :json
+    assert_response :success
+    @user_test.reload
+    assert_not @user_test.active
+  end
+
+  test "toggle_status returns not found for unknown email" do
+    put "/users/unknown@example.com/status", params: { user: { active: false } }, as: :json
+    assert_response :not_found
+  end
+
+  test "toggle_status finds user by username" do
+    put "/users/#{@user_test.username}/status", params: { user: { active: false } }, as: :json
+    assert_response :success
+    @user_test.reload
+    assert_not @user_test.active
+  end
+
+  test "toggle_status returns not found for unknown username" do
+    put "/users/nonexistent_user/status", params: { user: { active: false } }, as: :json
+    assert_response :not_found
+  end
+
+  # --- confirm_by_admin ---
+
+  test "admin can confirm a user" do
+    target = confirmed_user("confirm_target@example.local", role: "user",
+                           confirmed_at: nil)
+
+    put "/users/#{target.id}/confirm_by_admin", as: :json
+    assert_response :success
+    target.reload
+    assert_not_nil target.confirmed_at
+    assert target.active
+  end
+
+  test "non-admin cannot confirm a user" do
+    sign_out @user
+    regular = confirmed_user("reg_confirm@example.local", role: "user",
+                            confirmed_at: Time.current)
+    sign_in regular
+
+    put "/users/#{@user_test.id}/confirm_by_admin", as: :json
+    assert_response :unauthorized
+  end
+
+  test "confirm_by_admin returns not found for missing user" do
+    put "/users/999999/confirm_by_admin", as: :json
+    assert_response :not_found
+  end
+
+  test "confirm_by_admin finds user by email" do
+    target = confirmed_user("confirm_email@example.local", role: "user",
+                           confirmed_at: nil)
+
+    put "/users/#{target.email}/confirm_by_admin", as: :json
+    assert_response :success
+    target.reload
+    assert_not_nil target.confirmed_at
+  end
+
+  test "confirm_by_admin finds user by username" do
+    target = confirmed_user("confirm_user@example.local", role: "user",
+                           confirmed_at: nil)
+
+    put "/users/#{target.username}/confirm_by_admin", as: :json
+    assert_response :success
+    target.reload
+    assert_not_nil target.confirmed_at
+  end
+
+  # --- Error handling branches ---
+
+  test "destroy handles failure" do
+    user = User.find(@user_test.id)
+    user.define_singleton_method(:destroy) { false }
+    original_find = User.method(:find)
+    User.define_singleton_method(:find) { |id| user }
+
+    delete user_url(@user_test), as: :json
+    assert_response :unprocessable_entity
+  ensure
+    User.singleton_class.define_method(:find, original_find)
+  end
+
+  test "toggle_status handles update failure" do
+    user = User.find(@user_test.id)
+    user.define_singleton_method(:update) { |**| false }
+    original_find = User.method(:find)
+    User.define_singleton_method(:find) { |id| user }
+
+    put "/users/#{@user_test.id}/status", params: { user: { active: false } }, as: :json
+    assert_response :unprocessable_entity
+  ensure
+    User.singleton_class.define_method(:find, original_find)
+  end
+
+  test "confirm_by_admin handles update failure" do
+    user = User.find(@user_test.id)
+    user.define_singleton_method(:update) do |**|
+      errors.add(:base, "Update failed")
+      false
+    end
+    original_find = User.method(:find)
+    User.define_singleton_method(:find) { |id| user }
+
+    put "/users/#{@user_test.id}/confirm_by_admin", as: :json
+    assert_response :unprocessable_entity
+    assert_includes json_response.fetch("errors"), "Update failed"
+  ensure
+    User.singleton_class.define_method(:find, original_find)
+  end
 end
