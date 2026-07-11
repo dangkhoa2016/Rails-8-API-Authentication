@@ -7,9 +7,18 @@ class Users::PasswordsController < Devise::PasswordsController
   # end
 
   # POST /resource/password
-  # def create
-  #   super
-  # end
+  def create
+    super do |resource|
+      if successfully_sent?(resource)
+        return render json: {
+          message: find_message(:send_instructions, default: "You will receive an email with instructions on how to reset your password in a few minutes."),
+          user: resource
+        }, status: :ok
+      else
+        return render json: { errors: resource.errors.full_messages }, status: :unprocessable_entity
+      end
+    end
+  end
 
   # GET /resource/password/edit?reset_password_token=abcdef
   # def edit
@@ -17,9 +26,18 @@ class Users::PasswordsController < Devise::PasswordsController
   # end
 
   # PUT /resource/password
-  # def update
-  #   super
-  # end
+  def update
+    super do |resource|
+      if resource.errors.empty?
+        return render json: {
+          message: find_message(:updated_not_active, default: "Your password has been changed successfully."),
+          user: resource
+        }, status: :ok
+      else
+        return render json: { errors: resource.errors.full_messages }, status: :unprocessable_entity
+      end
+    end
+  end
 
   # protected
 
