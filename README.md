@@ -1,5 +1,9 @@
 # Rails 8 API Authentication with JWT
 
+[![Ruby 3.x](https://img.shields.io/badge/Ruby-3.x-red?style=flat&logo=ruby&logoColor=white)](https://www.ruby-lang.org/)
+[![Ruby 4.x](https://img.shields.io/badge/Ruby-4.x-red?style=flat&logo=ruby&logoColor=white)](https://www.ruby-lang.org/)
+[![Rails 8.1.3](https://img.shields.io/badge/Rails-8.1.3-CC0000?logo=rubyonrails&logoColor=white)](https://rubyonrails.org/)
+[![CircleCI](https://dl.circleci.com/status-badge/img/gh/dangkhoa2016/Rails-8-API-Authentication/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/dangkhoa2016/Rails-8-API-Authentication/tree/main)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > 🌐 Language / Ngôn ngữ: **English** | [Tiếng Việt](README.vi.md)
@@ -10,7 +14,7 @@ This project is a Rails 8 API authentication service built with Devise and JWT. 
 
 - User registration with email confirmation.
 - JWT-based sign in and sign out with token revocation via denylist.
-- Profile lookup with token metadata.
+- Profile lookup with token metadata via `/user/profile` and compatibility aliases `/user/me`, `/user/whoami`.
 - Self-service account update and account deletion.
 - User active/inactive status — deactivated accounts are automatically blocked from signing in.
 - Admin-only user listing, user creation, role updates, user deletion, account status toggling (lock/unlock), and email force-confirmation.
@@ -73,6 +77,7 @@ curl -sS -X POST http://localhost:4000/users \
   -d '{
     "user": {
       "email": "user@example.com",
+      "username": "user1",
       "password": "password",
       "password_confirmation": "password"
     }
@@ -137,7 +142,9 @@ PORT=4000
 RAILS_MAX_THREADS=3
 ```
 
-If you do not set `PORT`, `bin/dev` boots on `4000` locally. The full variable reference — including production secrets, Puma concurrency, mailer, admin seed, CORS, and the manual JWT token slot — is documented in `.env.sample`.
+If you do not set `PORT`, `bin/dev` boots on `4000` locally. The shipped `.env.sample` sets `PORT=4000`, so copying it unchanged moves local development to `http://localhost:4000`. The full variable reference — including production secrets, Puma concurrency, mailer, admin seed, CORS, and the manual JWT token slot — is documented in `.env.sample`.
+
+For browser clients running on a different origin, the default CORS config allows requests from `CORS_ALLOWED_ORIGINS` but does **not** expose the `Authorization` response header. If your frontend needs to read the JWT from the sign-in response, update `config/initializers/cors.rb` to expose that header explicitly.
 
 ## Code Coverage
 
@@ -178,6 +185,8 @@ The route contract below reflects `config/routes.rb` and the current controller 
 | GET | `/user/me` | Compatibility alias |
 | GET | `/user/whoami` | Compatibility alias |
 
+All three profile routes hit the same controller action and return the same payload shape.
+
 ### Admin and User Management Routes
 
 | Method | Path | Purpose |
@@ -206,6 +215,7 @@ Example sign-up request:
 {
   "user": {
     "email": "user@example.com",
+    "username": "user1",
     "password": "password",
     "password_confirmation": "password"
   }
@@ -223,6 +233,13 @@ Example sign-in request:
 }
 ```
 
+Self-service account updates on `PUT /users` or `PATCH /users` must include `current_password`. Admin-managed updates on `PUT /users/:id` go through `UsersController` and do not require `current_password`.
+
+Profile lookup also has two different unauthenticated failure modes:
+
+- Missing, expired, or revoked token: `422` with `user: null` plus `token_info`
+- Malformed token: `422` with `{ "error": "Invalid token" }`
+
 ## Example Flow
 
 ### 1. Register
@@ -233,6 +250,7 @@ curl -X POST http://localhost:4000/users \
   -d '{
     "user": {
       "email": "user@example.com",
+      "username": "user1",
       "password": "password",
       "password_confirmation": "password"
     }
@@ -269,6 +287,8 @@ curl http://localhost:4000/user/profile \
   -H "Authorization: Bearer <jwt_token>"
 ```
 
+`/user/me` and `/user/whoami` are compatibility aliases for the same response.
+
 ### 5. Sign Out
 
 ```bash
@@ -284,6 +304,15 @@ The files below currently reflect the implementation more accurately than the or
 - [manual/session.sh](./manual/session.sh)
 - [manual/password.sh](./manual/password.sh)
 - [manual/user.sh](./manual/user.sh)
+
+## Additional Documentation
+
+The `docs/` folder contains deeper implementation and operations notes for the current authentication stack:
+
+- [docs/ACCESS_CONTROL.md](./docs/ACCESS_CONTROL.md) - Authorization rules for guest, self-service, and admin flows
+- [docs/JWT_LIFECYCLE.md](./docs/JWT_LIFECYCLE.md) - JWT issuance, profile-token metadata, revocation, and cleanup
+- [docs/RATE_LIMITING.md](./docs/RATE_LIMITING.md) - Current Rack::Attack thresholds, error responses, and proxy considerations
+- [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) - Kamal, Docker, environment variables, health checks, and SQLite persistence
 
 ## Improvement Planning
 
