@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "../lib/exception_middleware"
 require_relative "boot"
 require "rails/all"
 require "dotenv/load" if Rails.env.development? || Rails.env.test?
