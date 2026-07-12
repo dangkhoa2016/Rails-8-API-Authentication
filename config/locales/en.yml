@@ -46,6 +46,9 @@ en:
   session:
     invalid_credentials: Invalid email or password
 
+  home:
+    welcome: Welcome to Rails 8 API Authentication
+
   user:
     deleted: User [%{email}] with id [%{id}] has been deleted
     signed_out: "Your account: %{email} has been signed out successfully"
