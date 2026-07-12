@@ -11,7 +11,6 @@ class ApplicationController < ActionController::API
   rescue_from ActionController::ParameterMissing, with: :parameter_missing
   # rescue_from ActionController::RoutingError, with: :route_not_found
   rescue_from ActionController::UnknownFormat, with: :route_not_found
-  rescue_from Exception, with: :handle_internal_error
 
   def decode_token(token_string)
     begin
@@ -54,6 +53,7 @@ class ApplicationController < ActionController::API
 
   # Handle parameter missing errors
   def parameter_missing(exception)
+    logger.error "Parameter missing: #{exception.message}"
     render json: { error: I18n.translate("errors.parameter_missing") }, status: :unprocessable_entity
   end
 end
