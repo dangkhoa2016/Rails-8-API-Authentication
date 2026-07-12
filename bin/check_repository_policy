@@ -1,0 +1,181 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Read-only repository policy checker.
+#
+# Usage:
+#   bin/check_repository_policy [REF] [MANUAL_BASE_REF]
+#
+# Audits REF (default HEAD) and exits non-zero if any project policy is
+# violated: tracked lockfile or coverage artifacts, non-conventional commit
+# messages, missing bullet bodies, mismatched author/committer dates, future
+# commit dates, future migration timestamps, forbidden workflow action
+# versions, immutability of non-Bash files under manual/, and — when a base
+# ref is provided — changes to those protected files since the base.
+#
+# The checker only reads repository state; it never modifies anything.
+
+require "open3"
+require "time"
+
+SUBJECT_PATTERN = /\A(?:build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(?:\([a-z0-9._-]+\))?!?: .+\z/
+BULLET_PATTERN = /\A- \S/
+FORBIDDEN_ACTION_VERSION = "v4"
+REQUIRED_ACTION_VERSIONS = {
+  "actions/checkout" => "v7",
+  "actions/upload-artifact" => "v7"
+}.freeze
+
+@violations = []
+
+def git(*args)
+  out, err, status = Open3.capture3("git", *args)
+  raise "git #{args.join(' ')} failed: #{err}" unless status.success?
+
+  out
+end
+
+def fail_check(category, message)
+  @violations << "[#{category}] #{message}"
+end
+
+def git_files(ref)
+  git("ls-tree", "-r", "--name-only", ref).lines.map(&:chomp)
+end
+
+def check_tracked_artifacts(ref, files)
+  fail_check("lockfile", "#{ref} tracks Gemfile.lock") if files.include?("Gemfile.lock")
+  files.grep(/\A(?:coverage|public\/coverage)\//).each do |path|
+    fail_check("coverage", "#{ref} tracks #{path}")
+  end
+end
+
+def check_workflow_actions(ref, files)
+  files.grep(/\A\.github\/workflows\//).each do |path|
+    content = git("show", "#{ref}:#{path}")
+    content.each_line do |line|
+      match = line.strip.match(/\A-?\s*uses:\s+(\S+)\z/)
+      next unless match
+
+      action, version = match[1].split("@", 2)
+      next if version.nil?
+
+      if version == FORBIDDEN_ACTION_VERSION
+        fail_check("workflow", "#{path} uses forbidden #{action}@#{version}")
+      end
+      required = REQUIRED_ACTION_VERSIONS[action]
+      if required && version != required
+        fail_check("workflow", "#{path} pins #{action}@#{version}, expected @#{required}")
+      end
+    end
+  end
+end
+
+def check_commit_records(ref)
+  log = git("log", ref, "--format=%H%x1f%s%x1f%b%x1f%aI%x1f%cI%x00")
+  log.split("\x00").each do |record|
+    next if record.strip.empty?
+
+    sha, subject, body, author_date, committer_date = record.split("\x1f", 5)
+    fail_check("subject", "#{sha} subject not conventional: #{subject.inspect}") unless subject.match?(SUBJECT_PATTERN)
+    unless body.to_s.lines.any? { |line| line.match?(BULLET_PATTERN) }
+      fail_check("body", "#{sha} body has no bullet line")
+    end
+    if author_date != committer_date
+      fail_check("dates", "#{sha} author date #{author_date} != committer date #{committer_date}")
+    end
+    now = Time.now
+    if Time.iso8601(author_date) > now
+      fail_check("dates", "#{sha} author date #{author_date} is in the future")
+    end
+    if Time.iso8601(committer_date) > now
+      fail_check("dates", "#{sha} committer date #{committer_date} is in the future")
+    end
+  end
+end
+
+def check_migrations(ref, files)
+  files.grep(/\Adb\/migrate\/\d+_.+\.rb\z/).each do |path|
+    basename = File.basename(path)
+    prefix = basename[0, 14]
+    next unless prefix.match?(/\A\d{14}\z/)
+
+    prefix_time = Time.utc(prefix[0, 4].to_i, prefix[4, 2].to_i, prefix[6, 2].to_i,
+                           prefix[8, 2].to_i, prefix[10, 2].to_i, prefix[12, 2].to_i)
+    add_sha = git("log", ref, "--diff-filter=A", "--format=%H", "--", path).lines.first
+    next if add_sha.nil?
+
+    add_date = Time.iso8601(git("log", "-1", "--format=%aI", add_sha.chomp).chomp)
+    fail_check("migration", "#{path} timestamp #{prefix} is not before its commit date") if prefix_time >= add_date
+  end
+end
+
+def protected_manual_file?(line)
+  _meta, path = line.split("\t", 2)
+  path && !path.end_with?(".sh")
+end
+
+def manual_file_map(ref)
+  git("ls-tree", "-r", ref, "--", "manual")
+    .lines.map(&:chomp)
+    .select { |line| protected_manual_file?(line) }
+    .to_h do |line|
+      meta, path = line.split("\t", 2)
+      [ path, meta.split(" ")[2] ]
+    end
+end
+
+def check_manual(ref, base)
+  return unless base
+
+  ref_map = manual_file_map(ref)
+  base_map = manual_file_map(base)
+  (ref_map.keys | base_map.keys).each do |path|
+    fail_check("manual", "protected file #{path} changed since #{base}") if ref_map[path] != base_map[path]
+  end
+end
+
+def manual_paths_in_history(ref)
+  git("log", ref, "--name-only", "--format=", "--", "manual")
+    .lines.map(&:chomp)
+    .select { |path| path.start_with?("manual/") && !path.end_with?(".sh") }
+    .uniq
+end
+
+def check_manual_history(ref, files)
+  manual_paths_in_history(ref).each do |path|
+    unless files.include?(path)
+      fail_check("manual", "protected file #{path} was deleted")
+      next
+    end
+
+    commits = git("log", ref, "--format=%H", "--", path).lines.map(&:chomp)
+    if commits.length != 1
+      fail_check("manual", "protected file #{path} changed in #{commits.length} commits")
+    end
+  end
+end
+
+ref = ARGV[0] || "HEAD"
+manual_base = ARGV[1]
+
+begin
+  files = git_files(ref)
+  check_tracked_artifacts(ref, files)
+  check_workflow_actions(ref, files)
+  check_commit_records(ref)
+  check_migrations(ref, files)
+  check_manual_history(ref, files)
+  check_manual(ref, manual_base)
+rescue StandardError => e
+  fail_check("error", e.message)
+end
+
+if @violations.empty?
+  puts "OK: #{ref} satisfies the repository policy"
+  exit 0
+end
+
+puts "FAIL: #{@violations.size} repository policy violation(s) for #{ref}"
+@violations.each { |violation| puts "ERROR #{violation}" }
+exit 1
