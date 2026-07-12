@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 class UsersController < ApplicationController
+  include UserAccessControl
+
+  before_action :authorize_user_access
   before_action :find_user, only: %i[show update destroy]
 
   # GET /users
