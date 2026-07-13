@@ -3,6 +3,7 @@
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
+require "securerandom"
 require "devise"
 
 module ActiveSupport
@@ -19,4 +20,8 @@ end
 
 class ActionDispatch::IntegrationTest
   include Devise::Test::IntegrationHelpers
+
+  def json_response
+    JSON.parse(response.body)
+  end
 end
