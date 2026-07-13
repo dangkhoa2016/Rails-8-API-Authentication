@@ -18,7 +18,11 @@ gem "tzinfo-data", platforms: %i[ windows jruby ]
 # Use the database-backed adapters for Rails.cache, Active Job, and Action Cable
 gem "solid_cache"
 gem "solid_queue"
-gem "solid_cable"
+if RUBY_VERSION < "4"
+  gem "solid_cable", "< 4.0"  # solid_cable >= 4.0 requires Ruby >= 3.3
+else
+  gem "solid_cable"
+end
 
 # Reduces boot times through caching; required in config/boot.rb
 # bootsnap >= 1.20 compiles native extensions requiring Ruby 4.0+ APIs
@@ -40,11 +44,18 @@ gem "thruster", require: false
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
 gem "rack-cors"
 
-# Required for Ruby 4.0 compatibility as cgi was removed from default gems (cgi/cookie extracted from stdlib)
-gem "cgi"
+# Ruby 4.x only — these gems are no longer in Ruby's default set
+if RUBY_VERSION >= "4"
+  gem "cgi"      # extracted from stdlib in Ruby 4
+  gem "tsort"    # removed from default gems in Ruby 4
+end
 
-# Required for Ruby 4.1+ as tsort will be removed from default gems
-gem "tsort"
+# Ruby 3.x compatibility pins — newer versions of these gems require Ruby >= 3.3
+if RUBY_VERSION < "4"
+  gem "dry-auto_inject", "< 1.2"
+  gem "dry-configurable", "< 1.4"
+  gem "parallel", "< 2.0"
+end
 
 # Rails 8.0.1 is not compatible with minitest 6
 gem "minitest", "< 6"
@@ -66,12 +77,17 @@ group :development, :test do
   gem "dotenv"
 
   # Code coverage
-  gem "simplecov", require: false
+  # Ruby 4 → SimpleCov 1.x (uses `skip`), Ruby 3 → SimpleCov 0.x (uses `add_filter`)
+  if RUBY_VERSION >= "4"
+    gem "simplecov", "~> 1.0", require: false
+  else
+    gem "simplecov", "~> 0.22", require: false
+  end
   gem "simplecov-console", require: false
 end
 
 
-gem "devise", "~> 4.9"
+gem "devise", "~> 5.0"
 
 gem "devise-jwt", "~> 0.13.0"
 
