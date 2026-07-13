@@ -7,6 +7,9 @@
 # Ignore bundler config.
 /.bundle
 
+# Ignore generated lockfiles — each Ruby version resolves its own in the image.
+/Gemfile.lock
+
 # Ignore all environment files.
 /.env*
 
