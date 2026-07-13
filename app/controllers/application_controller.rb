@@ -7,6 +7,7 @@ class ApplicationController < ActionController::API
 
   # Catch all types of errors and display messages to the user
   rescue_from StandardError, with: :handle_internal_error
+  rescue_from JWT::DecodeError, with: :handle_invalid_token
   rescue_from ActiveRecord::RecordNotFound, with: :record_not_found
   rescue_from ActionController::ParameterMissing, with: :parameter_missing
   # rescue_from ActionController::RoutingError, with: :route_not_found
@@ -43,6 +44,11 @@ class ApplicationController < ActionController::API
    def handle_internal_error(exception)
     logger.error "Internal error: #{exception.message}\n#{exception.backtrace.join("\n")}"
     render json: { error: I18n.translate("errors.internal_error") }, status: 500
+  end
+
+  def handle_invalid_token(exception)
+    logger.error "Invalid token: #{exception.message}"
+    render json: { error: I18n.translate("jwt.decode_error") }, status: :unauthorized
   end
 
   # Handle record not found errors
