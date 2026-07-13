@@ -317,6 +317,7 @@ Devise.setup do |config|
     jwt.secret = Rails.application.credentials.devise_jwt_secret_key.presence ||
       ENV["DEVISE_JWT_SECRET_KEY"].presence ||
       Rails.application.secret_key_base
+    jwt.request_formats = { user: [ nil, :json ] }
     # already config like the following code
     # jwt.revocation_requests = [
     #   ['DELETE', %r{^/users/sign_out$}],
