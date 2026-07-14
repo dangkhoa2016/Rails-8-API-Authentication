@@ -18,56 +18,62 @@ class RateLimitTest < ActionDispatch::IntegrationTest
   end
 
   test "sign in allows up to 5 requests per IP per 60s then throttles" do
-    discriminator = "signin-ip-#{SecureRandom.hex(4)}"
-    ip = "1.1.1.#{(rand * 200).to_i + 1}"
-    payload = { user: { email: "any-#{discriminator}@example.local", password: "wrong" } }.to_json
+    with_stable_throttle_window do
+      discriminator = "signin-ip-#{SecureRandom.hex(4)}"
+      ip = "1.1.1.#{(rand * 200).to_i + 1}"
+      payload = { user: { email: "any-#{discriminator}@example.local", password: "wrong" } }.to_json
 
-    5.times do
+      5.times do
+        post SIGN_IN_PATH, params: payload, headers: JSON_HEADERS, env: { "REMOTE_ADDR" => ip }
+        assert_not_equal 429, response.status, "Expected request to pass but got 429 on attempt #{_1 + 1}"
+      end
+
       post SIGN_IN_PATH, params: payload, headers: JSON_HEADERS, env: { "REMOTE_ADDR" => ip }
-      assert_not_equal 429, response.status, "Expected request to pass but got 429 on attempt #{_1 + 1}"
+      assert_response 429
+      assert_equal "Too many requests. Please try again later.", json_response.fetch("error")
+      assert response.headers.key?("Retry-After")
     end
-
-    post SIGN_IN_PATH, params: payload, headers: JSON_HEADERS, env: { "REMOTE_ADDR" => ip }
-    assert_response 429
-    assert_equal "Too many requests. Please try again later.", json_response.fetch("error")
-    assert response.headers.key?("Retry-After")
   end
 
   test "sign in throttle is per IP - different IP is not affected" do
-    discriminator = "signin-perip-#{SecureRandom.hex(4)}"
-    throttle_ip = "2.2.2.#{(rand * 200).to_i + 1}"
-    other_ip = "3.3.3.#{(rand * 200).to_i + 1}"
-    payload = { user: { email: "any-#{discriminator}@example.local", password: "wrong" } }.to_json
+    with_stable_throttle_window do
+      discriminator = "signin-perip-#{SecureRandom.hex(4)}"
+      throttle_ip = "2.2.2.#{(rand * 200).to_i + 1}"
+      other_ip = "3.3.3.#{(rand * 200).to_i + 1}"
+      payload = { user: { email: "any-#{discriminator}@example.local", password: "wrong" } }.to_json
 
-    5.times do
-      post SIGN_IN_PATH, params: payload, headers: JSON_HEADERS, env: { "REMOTE_ADDR" => throttle_ip }
+      5.times do
+        post SIGN_IN_PATH, params: payload, headers: JSON_HEADERS, env: { "REMOTE_ADDR" => throttle_ip }
+      end
+
+      post SIGN_IN_PATH, params: payload, headers: JSON_HEADERS, env: { "REMOTE_ADDR" => other_ip }
+      assert_not_equal 429, response.status
     end
-
-    post SIGN_IN_PATH, params: payload, headers: JSON_HEADERS, env: { "REMOTE_ADDR" => other_ip }
-    assert_not_equal 429, response.status
   end
 
   test "sign in throttles 10 attempts per email across different IPs" do
-    discriminator = "email-#{SecureRandom.hex(4)}"
-    email = "victim-#{discriminator}@example.local"
+    with_stable_throttle_window do
+      discriminator = "email-#{SecureRandom.hex(4)}"
+      email = "victim-#{discriminator}@example.local"
 
-    10.times do |i|
-      ip = "10.10.10.#{i + 1}"
+      10.times do |i|
+        ip = "10.10.10.#{i + 1}"
+        post SIGN_IN_PATH,
+          params: { user: { email: email, password: "wrong" } }.to_json,
+          headers: JSON_HEADERS,
+          env: { "REMOTE_ADDR" => ip }
+        assert_not_equal 429, response.status,
+          "Expected request to pass but got 429 on attempt #{i + 1} from IP #{ip}"
+      end
+
       post SIGN_IN_PATH,
         params: { user: { email: email, password: "wrong" } }.to_json,
         headers: JSON_HEADERS,
-        env: { "REMOTE_ADDR" => ip }
-      assert_not_equal 429, response.status,
-        "Expected request to pass but got 429 on attempt #{i + 1} from IP #{ip}"
+        env: { "REMOTE_ADDR" => "10.10.10.99" }
+
+      assert_response 429
+      assert_equal "Too many requests. Please try again later.", json_response.fetch("error")
     end
-
-    post SIGN_IN_PATH,
-      params: { user: { email: email, password: "wrong" } }.to_json,
-      headers: JSON_HEADERS,
-      env: { "REMOTE_ADDR" => "10.10.10.99" }
-
-    assert_response 429
-    assert_equal "Too many requests. Please try again later.", json_response.fetch("error")
   end
 
   test "registration allows up to 10 requests per IP per hour then throttles" do
@@ -130,5 +136,11 @@ class RateLimitTest < ActionDispatch::IntegrationTest
       get "/up", env: { "REMOTE_ADDR" => ip }
       assert_not_equal 429, response.status
     end
+  end
+
+  private
+
+  def with_stable_throttle_window
+    Time.stub(:now, Time.new(2026, 7, 31, 0, 0, 0)) { yield }
   end
 end
