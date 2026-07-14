@@ -3,6 +3,7 @@
 [![Ruby 3.x](https://img.shields.io/badge/Ruby-3.x-red?style=flat&logo=ruby&logoColor=white)](https://www.ruby-lang.org/)
 [![Ruby 4.x](https://img.shields.io/badge/Ruby-4.x-red?style=flat&logo=ruby&logoColor=white)](https://www.ruby-lang.org/)
 [![Rails 8.1.3](https://img.shields.io/badge/Rails-8.1.3-CC0000?logo=rubyonrails&logoColor=white)](https://rubyonrails.org/)
+[![CI](https://github.com/dangkhoa2016/Rails-8-API-Authentication/actions/workflows/ci.yml/badge.svg)](https://github.com/dangkhoa2016/Rails-8-API-Authentication/actions/workflows/ci.yml)
 [![CircleCI](https://dl.circleci.com/status-badge/img/gh/dangkhoa2016/Rails-8-API-Authentication/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/dangkhoa2016/Rails-8-API-Authentication/tree/main)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -12,14 +13,14 @@ This project is a Rails 8 API authentication service built with Devise and JWT. 
 
 ## Features
 
-- User registration with email confirmation.
+- User registration with `username` and email confirmation.
 - JWT-based sign in and sign out with token revocation via denylist.
 - Profile lookup with token metadata via `/user/profile` and compatibility aliases `/user/me`, `/user/whoami`.
 - Self-service account update and account deletion.
 - User active/inactive status — deactivated accounts are automatically blocked from signing in.
 - Admin-only user listing, user creation, role updates, user deletion, account status toggling (lock/unlock), and email force-confirmation.
 - Rate limiting on sign-in, registration, and password-reset endpoints.
-- JWT denylist cleanup via job/task support.
+- JWT denylist cleanup via Active Job and Rake task.
 - Docker + Kamal deployment scaffolding with a health check endpoint.
 - CI with Brakeman, RuboCop, the full Rails test suite, and a dedicated auth regression job.
 
@@ -133,7 +134,7 @@ Copy `.env.sample` to `.env` for local development:
 cp .env.sample .env
 ```
 
-Minimum required settings for local development:
+Recommended local settings for development:
 
 ```env
 RAILS_ENV=development
@@ -207,7 +208,7 @@ All three profile routes hit the same controller action and return the same payl
 
 ## Request Format Notes
 
-Devise endpoints expect payloads nested under the `user` key.
+Devise endpoints expect payloads nested under the `user` key. For registration (`POST /users`), the `username` field is optional.
 
 Example sign-up request:
 
@@ -320,6 +321,12 @@ Project improvement artifacts are tracked in:
 
 - [manual/PROJECT_IMPROVEMENT_REPORT.md](./manual/PROJECT_IMPROVEMENT_REPORT.md)
 - [manual/IMPLEMENTATION_TRACKER.md](./manual/IMPLEMENTATION_TRACKER.md)
+
+## Related Projects
+
+This project has a sibling Node.js implementation that covers similar authentication concepts (JWT, role-based access control, token revocation) on a different stack:
+
+- **[dangkhoa2016/Nodejs-API-Authentication](https://github.com/dangkhoa2016/Nodejs-API-Authentication)** — A production-ready REST API for authentication and user management, built with **Hono**, **Sequelize**, **bcryptjs**, **JWT**, **SQLite** (dev), and **Postgres** (prod).
 
 ## License
 
