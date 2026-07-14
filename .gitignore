@@ -7,6 +7,10 @@
 # Ignore bundler config.
 /.bundle
 
+# Ignore code coverage reports.
+/coverage/
+/public/coverage/
+
 # Ignore all environment files.
 /.env
 
@@ -30,3 +34,6 @@
 
 # Ignore master key for decrypting credentials and more.
 /config/master.key
+
+# Ignore Gemfile.lock — each Ruby version generates its own
+Gemfile.lock
