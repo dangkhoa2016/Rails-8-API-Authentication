@@ -98,6 +98,10 @@ group :development, :test do
 
   # Load environment variables from .env files
   gem "dotenv"
+
+  # Code coverage
+  gem "simplecov", require: false
+  gem "simplecov-console", require: false
 end
 
 
