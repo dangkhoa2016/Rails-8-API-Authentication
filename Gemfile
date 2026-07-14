@@ -48,7 +48,7 @@ gem "thruster", require: false
 # gem "image_processing", "~> 1.2"
 
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
-# gem "rack-cors"
+gem "rack-cors"
 
 # Ruby 4.x only — these gems are no longer in Ruby's default set
 if ruby_version >= Gem::Version.new("4")
@@ -96,6 +96,8 @@ group :development, :test do
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
 
+  # Load environment variables from .env files
+  gem "dotenv"
 end
 
 
