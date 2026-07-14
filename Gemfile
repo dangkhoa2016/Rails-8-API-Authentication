@@ -18,8 +18,9 @@ gem "tzinfo-data", platforms: %i[ windows jruby ]
 # Use the database-backed adapters for Rails.cache, Active Job, and Action Cable
 gem "solid_cache"
 gem "solid_queue"
-if RUBY_VERSION < "4"
-  gem "solid_cable", "< 4.0"  # solid_cable >= 4.0 requires Ruby >= 3.3
+# solid_cable >= 4.0 requires Ruby >= 3.3
+if RUBY_VERSION < "3.3"
+  gem "solid_cable", "< 4.0"
 else
   gem "solid_cable"
 end
