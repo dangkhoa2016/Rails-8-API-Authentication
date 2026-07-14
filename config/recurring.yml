@@ -1,3 +1,9 @@
+production:
+  clean_expired_jwt_denylists:
+    class: CleanExpiredJwtDenylistsJob
+    queue: background
+    schedule: every hour
+
 # production:
 #   periodic_cleanup:
 #     class: CleanSoftDeletedRecordsJob
