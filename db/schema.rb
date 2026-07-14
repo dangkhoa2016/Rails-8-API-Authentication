@@ -10,13 +10,14 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_09_194402) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_14_033208) do
   create_table "jwt_denylists", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "exp"
     t.string "jti"
     t.datetime "updated_at", null: false
-    t.index ["jti"], name: "index_jwt_denylists_on_jti"
+    t.index ["jti", "exp"], name: "index_jwt_denylists_on_jti_and_exp"
+    t.index ["jti"], name: "index_jwt_denylists_on_jti", unique: true
   end
 
   create_table "users", force: :cascade do |t|
@@ -48,5 +49,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_09_194402) do
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
     t.index ["unlock_token"], name: "index_users_on_unlock_token", unique: true
+    t.index ["username"], name: "index_users_on_username", unique: true
   end
 end
