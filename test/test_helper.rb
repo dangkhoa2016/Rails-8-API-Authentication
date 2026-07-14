@@ -27,16 +27,51 @@ end
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
-require "securerandom"
+require "minitest/mock"
+require "cgi"
 require "devise"
+require "devise/jwt/test_helpers"
+require "securerandom"
 
 module ActiveSupport
   class TestCase
     # Run tests in parallel with specified workers
-    parallelize(workers: :number_of_processors)
+    # (single-process when measuring coverage so SimpleCov results are complete)
+    parallelize(workers: :number_of_processors) unless ENV["COVERAGE"]
 
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
     fixtures :all
+
+    def confirmed_user(email, password: "Password1!", **attributes)
+      base = email.split("@").first.gsub(/[^\w]/, "_")
+      suffix = "_#{SecureRandom.hex(2)}"
+      max_base = 25 - suffix.length
+      attributes[:username] ||= base.length > max_base ? base[0, max_base] + suffix : base + suffix
+      User.create!(
+        {
+          email: email,
+          password: password,
+          password_confirmation: password,
+          confirmed_at: Time.current
+        }.merge(attributes)
+      )
+    end
+
+    def jwt_auth_headers_for(user, headers = nil)
+      headers ||= { "Accept" => "application/json", "Content-Type" => "application/json" }
+      Devise::JWT::TestHelpers.auth_headers(headers, user)
+    end
+
+    def decode_jwt(token)
+      payload, = JWT.decode(
+        token,
+        Warden::JWTAuth.config.secret,
+        true,
+        algorithm: Warden::JWTAuth.config.algorithm
+      )
+
+      payload
+    end
 
     # Add more helper methods to be used by all tests here...
   end
@@ -47,5 +82,24 @@ class ActionDispatch::IntegrationTest
 
   def json_response
     JSON.parse(response.body)
+  end
+
+  def json_headers
+    {
+      "Accept" => "application/json",
+      "Content-Type" => "application/json"
+    }
+  end
+
+  def authorization_headers(token)
+    json_headers.merge("Authorization" => "Bearer #{token}")
+  end
+
+  def bearer_token_from_headers(headers)
+    headers.fetch("Authorization").delete_prefix("Bearer ")
+  end
+
+  def bearer_token_from_response
+    response.headers.fetch("Authorization", "").delete_prefix("Bearer ")
   end
 end

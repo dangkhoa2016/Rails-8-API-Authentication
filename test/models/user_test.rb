@@ -21,4 +21,36 @@ class UserTest < ActiveSupport::TestCase
   test "find one" do
     assert_equal "user2@example.local", users(:two).email
   end
+
+  test "send confirmation instructions logs and swallows delivery errors" do
+    user = User.create!(
+      email: "delivery-error@example.local",
+      username: "delivery_error_user",
+      password: "Password1!",
+      password_confirmation: "Password1!"
+    )
+
+    logger = Class.new {
+      attr_reader :messages
+
+      def initialize
+        @messages = []
+      end
+
+      def error(message)
+        @messages << message
+        nil
+      end
+    }.new
+
+    user.define_singleton_method(:send_devise_notification) do |*_args|
+      raise Net::SMTPFatalError, "mailer exploded"
+    end
+
+    Rails.stub(:logger, logger) do
+      assert_equal false, user.send_confirmation_instructions
+    end
+
+    assert user.errors[:base].any? { |e| e.include?("Could not send confirmation email") }
+  end
 end
