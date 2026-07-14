@@ -1,5 +1,29 @@
 # frozen_string_literal: true
 
+if ENV["COVERAGE"]
+  require "simplecov"
+  require "simplecov-console"
+  require "simplecov_json_formatter"
+  SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter.new([
+    SimpleCov::Formatter::HTMLFormatter,
+    SimpleCov::Formatter::JSONFormatter,
+    SimpleCov::Formatter::Console
+  ])
+
+  SimpleCov.start "rails" do
+    coverage_dir "public/coverage"
+    if Gem::Version.new(SimpleCov::VERSION) >= Gem::Version.new("1.0")
+      skip "/test/"
+      skip "/config/"
+      skip "/vendor/"
+    else
+      add_filter "/test/"
+      add_filter "/config/"
+      add_filter "/vendor/"
+    end
+  end
+end
+
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
