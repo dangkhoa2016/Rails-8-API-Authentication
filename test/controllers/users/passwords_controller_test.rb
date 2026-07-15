@@ -53,4 +53,19 @@ class Users::PasswordsControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert json_response["errors"].present?
   end
+
+  test "update password with mismatch confirmation" do
+    raw_token = @user.send_reset_password_instructions
+    @user.reload
+
+    put user_password_url, params: {
+      user: {
+        reset_password_token: raw_token,
+        password: "NewPassword1!",
+        password_confirmation: "Different1!"
+      }
+    }, as: :json
+
+    assert_response :unprocessable_entity
+  end
 end
