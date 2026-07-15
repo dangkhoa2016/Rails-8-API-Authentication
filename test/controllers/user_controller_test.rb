@@ -133,6 +133,47 @@ class UserControllerTest < ActionDispatch::IntegrationTest
     assert_equal :unprocessable_entity, controller.rendered_status
     assert_includes controller.rendered_json[:errors], "cannot delete"
   end
+
+  # --- Non-admin access rejection ---
+
+  test "non-admin cannot access users index" do
+    sign_out @user
+    regular = confirmed_user("regular@example.local", role: "user",
+                             first_name: "Regular", last_name: "User",
+                             confirmed_at: Time.current)
+    sign_in regular
+
+    get users_url, as: :json
+    assert_response :forbidden
+    assert_kind_of String, json_response.fetch("error")
+  end
+
+  test "non-admin cannot destroy another user" do
+    sign_out @user
+    regular = confirmed_user("regular2@example.local", role: "user",
+                             first_name: "Regular", last_name: "User",
+                             confirmed_at: Time.current)
+    sign_in regular
+
+    delete user_url(@user_test), as: :json
+    assert_response :forbidden
+    assert_kind_of String, json_response.fetch("error")
+  end
+
+  # --- Password confirmation mismatch ---
+
+  test "cannot create user when password confirmation does not match" do
+    post users_create_url, params: {
+      user: {
+        email: "mismatch@example.local",
+        username: "mismatch_user",
+        password: "Password1!",
+        password_confirmation: "different"
+      }
+    }, as: :json
+    assert_response :unprocessable_entity
+    assert_not_nil json_response["errors"]
+  end
 end
 
 class TestUsersController < UsersController
