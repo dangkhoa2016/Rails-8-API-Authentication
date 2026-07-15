@@ -36,6 +36,21 @@ class Users::RegistrationsControllerTest < ActionDispatch::IntegrationTest
     assert json_response["errors"].any? { |e| e.downcase.include?("email") }
   end
 
+  test "signup failure with short password" do
+    assert_no_difference("User.count") do
+      post user_registration_url, params: {
+        user: {
+          email: "short@example.com",
+          password: "123",
+          password_confirmation: "123"
+        }
+      }, as: :json
+    end
+
+    assert_response :unprocessable_entity
+    assert json_response["errors"].any? { |e| e.downcase.include?("password") }
+  end
+
   test "signup failure with password missing complexity" do
     assert_no_difference("User.count") do
       post user_registration_url, params: {
@@ -49,6 +64,36 @@ class Users::RegistrationsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :unprocessable_entity
     assert json_response["errors"].any? { |e| e.downcase.include?("password") }
+  end
+
+  test "signup failure with missing email" do
+    assert_no_difference("User.count") do
+      post user_registration_url, params: {
+        user: {
+          email: "",
+          password: "Password1!",
+          password_confirmation: "Password1!"
+        }
+      }, as: :json
+    end
+
+    assert_response :unprocessable_entity
+    assert json_response["errors"].any? { |e| e.downcase.include?("email") }
+  end
+
+  test "signup failure with password confirmation mismatch" do
+    assert_no_difference("User.count") do
+      post user_registration_url, params: {
+        user: {
+          email: "mismatch@example.com",
+          password: "Password1!",
+          password_confirmation: "Different1"
+        }
+      }, as: :json
+    end
+
+    assert_response :unprocessable_entity
+    assert json_response["errors"].any? { |e| e.downcase.include?("confirmation") }
   end
 
   test "update profile success" do
