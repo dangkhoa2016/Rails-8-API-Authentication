@@ -70,16 +70,102 @@ gem install rails -v 8
     RAILS_ENV=development
     PORT=4000
     RAILS_MAX_THREADS=1
-    PORT=4000
     ```
 
-## API Endpoints
+## Environment
 
-### 1. **POST /register**
-- Registers a new user.
-- **Body**:
-    ```json
-    {
+The sample environment file currently contains the minimum local settings:
+
+```env
+RAILS_LOG_TO_STDOUT=true
+RAILS_ENV=development
+PORT=4000
+RAILS_MAX_THREADS=1
+```
+
+If you do not set `PORT`, `bin/dev` boots on `4000` locally.
+
+## Code Coverage
+
+Generate a coverage report locally with SimpleCov by running the test suite with `COVERAGE=1`:
+
+```bash
+COVERAGE=1 bin/rails test
+```
+
+The report is written to `public/coverage`. While the Rails server is running in development, open `http://localhost:4000/coverage` to view the latest generated report. This route is development-only and simply redirects to the static HTML report.
+
+Internally, the app redirects `/coverage` to `/coverage/` before the static file server handles the request. The trailing slash matters because the generated SimpleCov HTML references assets with relative paths such as `./assets/...`.
+
+## Current Route Contract
+
+The route contract below reflects `config/routes.rb` and the current controller implementation.
+
+### Authentication Routes
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| POST | `/users` | Register a new account |
+| POST | `/users/sign_in` | Sign in and receive JWT in the `Authorization` response header |
+| DELETE | `/users/sign_out` | Sign out and revoke the current token |
+| GET | `/users/confirmation` | Confirm email via Devise confirmable flow |
+| PUT/PATCH | `/users` | Update the current signed-in account |
+| DELETE | `/users` | Delete the current signed-in account |
+
+### Profile Routes
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/user/profile` | Primary profile endpoint |
+| GET | `/user/me` | Compatibility alias |
+| GET | `/user/whoami` | Compatibility alias |
+
+### Admin and User Management Routes
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/users` | List users, admin only |
+| POST | `/users/create` | Create a user as admin |
+| GET | `/users/:id` | View a user; admin or self |
+| PUT | `/users/:id` | Update a user; admin or self |
+| DELETE | `/users/:id` | Delete a user; admin or self |
+
+## Request Format Notes
+
+Devise endpoints expect payloads nested under the `user` key.
+
+Example sign-up request:
+
+```json
+{
+  "user": {
+    "email": "user@example.com",
+    "password": "password",
+    "password_confirmation": "password"
+  }
+}
+```
+
+Example sign-in request:
+
+```json
+{
+  "user": {
+    "email": "user@example.com",
+    "password": "password"
+  }
+}
+```
+
+## Example Flow
+
+### 1. Register
+
+```bash
+curl -X POST http://localhost:4000/users \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user": {
       "email": "user@example.com",
       "password": "password123",
       "username": "user123"
