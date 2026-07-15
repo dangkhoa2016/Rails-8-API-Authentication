@@ -102,6 +102,7 @@ group :development, :test do
   # Code coverage
   gem "simplecov", require: false
   gem "simplecov-console", require: false
+  gem "json", "~> 2.10.0", require: false if RUBY_VERSION.start_with?("3.2")
 end
 
 
