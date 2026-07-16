@@ -62,7 +62,7 @@ end
 gem "minitest", "< 6"
 
 # Pin rdoc to match system version (7.2.0) to avoid double-load warnings
-gem "rdoc", "~> 7.2"
+gem "rdoc", "~> 8.0"
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
