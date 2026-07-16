@@ -79,6 +79,29 @@ class ApplicationControllerTest < ActiveSupport::TestCase
     assert_includes logger.messages, "Record not found: User not found"
   end
 
+  test "parameter missing errors return 422" do
+    controller = TestErrorsController.new
+    logger = Class.new do
+      attr_reader :messages
+
+      def initialize
+        @messages = []
+      end
+
+      def error(message)
+        @messages << message
+      end
+    end.new
+
+    controller.define_singleton_method(:logger) { logger }
+
+    exception = ActionController::ParameterMissing.new("user")
+    controller.send(:parameter_missing, exception)
+
+    assert_equal({ error: I18n.translate("errors.parameter_missing") }, controller.rendered_json)
+    assert_equal :unprocessable_entity, controller.rendered_status
+  end
+
   test "build_token_info decodes payload from token when token_info lacks payload" do
     user = confirmed_user("unit_test@example.local")
     token = jwt_auth_headers_for(user).fetch("Authorization").delete_prefix("Bearer ")
