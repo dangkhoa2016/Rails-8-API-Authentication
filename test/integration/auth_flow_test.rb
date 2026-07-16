@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "test_helper"
-require "cgi"
 
 class AuthFlowTest < ActionDispatch::IntegrationTest
   setup do
@@ -55,12 +54,7 @@ class AuthFlowTest < ActionDispatch::IntegrationTest
 
     token = bearer_token_from_response
     assert token.present?
-    payload, = JWT.decode(
-      token,
-      Warden::JWTAuth.config.secret,
-      true,
-      algorithm: Warden::JWTAuth.config.algorithm
-    )
+    payload = decode_jwt(token)
     assert_equal user.id.to_s, payload.fetch("sub")
 
     get "/user/profile", headers: authorization_headers(token), as: :json
