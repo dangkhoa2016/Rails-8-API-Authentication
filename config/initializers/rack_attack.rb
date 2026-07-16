@@ -22,7 +22,11 @@ class Rack::Attack
   end
 
   # Never throttle requests from localhost (development / test / CI smoke runs).
-  if Rails.env.development? || Rails.env.test?
+  # The API test suites boot the server with RAILS_ENV=production
+  # (scripts/test_ruby_versions.sh), so opt in via RACK_ATTACK_SAFELIST_LOCALHOST
+  # to keep localhost unthrottled for CI smoke runs without weakening real
+  # production deployments (which set no such flag).
+  if Rails.env.development? || Rails.env.test? || ENV["RACK_ATTACK_SAFELIST_LOCALHOST"] == "true"
     safelist("allow localhost") do |req|
       req.ip == "127.0.0.1" || req.ip == "::1"
     end
