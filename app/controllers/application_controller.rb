@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 class ApplicationController < ActionController::API
+  include Pagy::Method
   include ActionController::MimeResponds
   respond_to :json
   before_action :configure_permitted_parameters, if: :devise_controller?
@@ -31,6 +32,15 @@ class ApplicationController < ActionController::API
   def handle_invalid_token(exception)
     logger.error "Invalid token: #{exception.message}"
     render json: { error: I18n.translate("jwt.decode_error") }, status: :unauthorized
+  end
+
+  def pagy_from_metadata(pagy)
+    {
+      current_page: pagy.page,
+      per_page: pagy.limit,
+      total_count: pagy.count,
+      total_pages: pagy.last
+    }
   end
 
   # Handle record not found errors
