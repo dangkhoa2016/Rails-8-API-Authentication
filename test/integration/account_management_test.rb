@@ -41,6 +41,21 @@ class AccountManagementTest < ActionDispatch::IntegrationTest
     assert_includes json_response.fetch("errors"), "Username has already been taken"
   end
 
+  test "registration without username creates user successfully" do
+    assert_difference("User.count", 1) do
+      post "/users", params: {
+        user: {
+          email: "no-username@example.local",
+          password: "Password1!",
+          password_confirmation: "Password1!"
+        }
+      }, as: :json
+    end
+
+    assert_response :success
+    assert_nil User.find_by(email: "no-username@example.local").username
+  end
+
   test "signed in user can update account with current password" do
     user = confirmed_user("account-update@example.local", username: "account_update_user")
     sign_in user
