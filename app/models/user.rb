@@ -12,7 +12,7 @@ class User < ApplicationRecord
          :jwt_authenticatable, jwt_revocation_strategy: JwtDenylist
 
   validates :password, format: {
-    with: /\A(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+    with: /\A(?=.*[a-z])(?=.*[A-Z])(?=.*\d).*\z/,
     message: "must include at least 1 uppercase letter, 1 lowercase letter, and 1 number"
   }, if: :password_required?
 
@@ -30,18 +30,23 @@ class User < ApplicationRecord
   attr_accessor :token_info
   enum :role, { user: "user", admin: "admin" }
 
+  def active_for_authentication?
+    super && active?
+  end
+
+  def inactive_message
+    active? ? super : :account_inactive
+  end
+
   def on_jwt_dispatch(token, payload)
     # puts "on_jwt_dispatch: #{token}, #{payload}"
     self.token_info = { token: token, payload: payload }
   end
 
   def serializable_hash(options = nil)
-    result = super
-
-    if unconfirmed_email.present?
-      result[:unconfirmed_email] = unconfirmed_email
-    end
-
+    opts = (options || {}).merge(except: SENSITIVE_FIELDS)
+    result = super(opts)
+    result[:unconfirmed_email] = unconfirmed_email if unconfirmed_email.present?
     result
   end
 
@@ -53,10 +58,25 @@ class User < ApplicationRecord
     false
   end
 
+  SENSITIVE_FIELDS = %w[
+    encrypted_password
+    reset_password_token
+    confirmation_token
+    unlock_token
+    jti
+    current_sign_in_ip
+    last_sign_in_ip
+    current_sign_in_at
+    last_sign_in_at
+    sign_in_count
+    failed_attempts
+    locked_at
+  ].freeze
+
   private
 
   def normalize_username
-    self.username = username.to_s.gsub(/\s+/, "").downcase.presence
+    self.username = username.to_s.strip.parameterize.underscore.downcase.presence
   end
 
   def password_required?
