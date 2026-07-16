@@ -102,4 +102,28 @@ class ActionDispatch::IntegrationTest
   def bearer_token_from_response
     response.headers.fetch("Authorization", "").delete_prefix("Bearer ")
   end
+
+  def expired_token_for(user, issued_at: 2.hours.ago, expired_at: 1.hour.ago)
+    payload = {
+      "sub" => user.id.to_s,
+      "scp" => "user",
+      "aud" => nil,
+      "iat" => issued_at.to_i,
+      "exp" => expired_at.to_i,
+      "jti" => SecureRandom.uuid
+    }
+
+    token = JWT.encode(payload, Warden::JWTAuth.config.secret, Warden::JWTAuth.config.algorithm)
+
+    [ token, payload ]
+  end
+
+  def confirmation_token_from_last_email
+    body = ActionMailer::Base.deliveries.last.body.encoded
+    match = body.match(/confirmation_token=([^\"]+)/)
+
+    assert_not_nil match, "Expected confirmation token in email body"
+
+    CGI.unescape(match[1])
+  end
 end
