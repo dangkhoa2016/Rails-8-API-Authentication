@@ -76,6 +76,16 @@ class AuthNegativeTest < ActionDispatch::IntegrationTest
     assert_equal({ "error" => "Invalid token" }, json_response)
   end
 
+  test "expired token returns unauthorized" do
+    user = confirmed_user("expired@example.local")
+    token, _payload = expired_token_for(user)
+
+    get "/user/profile", headers: authorization_headers(token), as: :json
+
+    assert_response :unauthorized
+    assert_equal({ "error" => "Invalid token" }, json_response)
+  end
+
   test "revoked token cannot be reused for profile access" do
     user = confirmed_user("revoked@example.local")
     headers = jwt_auth_headers_for(user)
@@ -95,6 +105,7 @@ class AuthNegativeTest < ActionDispatch::IntegrationTest
     assert_nil body["user"]
     assert_equal token, body.dig("token_info", "token")
     assert_equal payload.fetch("jti"), body.dig("token_info", "jti")
+    assert_equal false, body.dig("token_info", "expired")
     assert JwtDenylist.exists?(jti: payload.fetch("jti"))
   end
 end
