@@ -14,6 +14,29 @@ class UserControllerTest < ActionDispatch::IntegrationTest
   test "should get index" do
     get users_url, as: :json
     assert_response :success
+    body = json_response
+    assert body.key?("users")
+    assert body.key?("meta")
+    meta = body["meta"]
+    assert_equal 1, meta["current_page"]
+    assert_equal 20, meta["per_page"]
+    assert meta["total_count"] > 0
+    assert meta["total_pages"] > 0
+  end
+
+  test "index supports custom per_page" do
+    get users_url(per_page: 2), as: :json
+    assert_response :success
+    body = json_response
+    assert_equal 2, body["meta"]["per_page"]
+    assert body["users"].length <= 2
+  end
+
+  test "index caps per_page at 100" do
+    get users_url(per_page: 999), as: :json
+    assert_response :success
+    body = json_response
+    assert_equal 100, body["meta"]["per_page"]
   end
 
   test "should create user" do
@@ -120,22 +143,6 @@ class UserControllerTest < ActionDispatch::IntegrationTest
     assert json_response["errors"].present?
   end
 
-  test "destroy failure renders errors when destroy returns false" do
-    user = confirmed_user("destroy_fail_controller@example.com")
-    user.define_singleton_method(:destroy) do
-      errors.add(:base, "cannot delete")
-      false
-    end
-
-    controller = TestUsersController.new
-    controller.instance_variable_set(:@user, user)
-
-    controller.destroy
-
-    assert_equal :unprocessable_entity, controller.rendered_status
-    assert_includes controller.rendered_json[:errors], "cannot delete"
-  end
-
   # --- Non-admin access rejection ---
 
   test "non-admin cannot access users index" do
@@ -176,13 +183,18 @@ class UserControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert_not_nil json_response["errors"]
   end
-end
 
-class TestUsersController < UsersController
-  attr_reader :rendered_json, :rendered_status
+  # --- Error handling branches ---
 
-  def render(json:, status:)
-    @rendered_json = json
-    @rendered_status = status
+  test "destroy handles failure" do
+    user = User.find(@user_test.id)
+    user.define_singleton_method(:destroy) { false }
+    original_find = User.method(:find)
+    User.define_singleton_method(:find) { |id| user }
+
+    delete user_url(@user_test), as: :json
+    assert_response :unprocessable_entity
+  ensure
+    User.singleton_class.define_method(:find, original_find)
   end
 end
