@@ -59,7 +59,7 @@ if RUBY_VERSION < "4"
 end
 
 # Rails 8.0.1 is not compatible with minitest 6
-gem "minitest", "< 6"
+gem "minitest", "< 7"
 
 # Pin rdoc to match system version (7.2.0) to avoid double-load warnings
 gem "rdoc", "~> 7.2"
