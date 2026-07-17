@@ -55,4 +55,12 @@ class CleanExpiredJwtDenylistsJobTest < ActiveJob::TestCase
 
     assert_includes logger.messages, "[CleanExpiredJwtDenylistsJob] Deleted 0 expired JWT denylist entries"
   end
+
+  test "job is configured in recurring.yml" do
+    recurring = YAML.load_file(Rails.root.join("config/recurring.yml"))
+    production_config = recurring["production"]
+    assert production_config, "No production config found in recurring.yml"
+    assert production_config.dig("clean_expired_jwt_denylists", "class"), "Job class not configured"
+    assert production_config.dig("clean_expired_jwt_denylists", "schedule"), "Schedule not configured"
+  end
 end
