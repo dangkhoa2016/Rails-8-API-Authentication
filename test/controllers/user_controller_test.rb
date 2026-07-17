@@ -224,4 +224,44 @@ class UserControllerTest < ActionDispatch::IntegrationTest
     assert_not_equal etag_page1, etag_different
   end
 
+  test "admin can create user with role" do
+    post users_create_url, params: {
+      user: {
+        email: "admin_created@example.local",
+        username: "admin_created",
+        password: "Password1!",
+        role: "admin"
+      }
+    }, as: :json
+
+    assert_response :created
+    assert_equal "admin", User.find_by(email: "admin_created@example.local").role
+  end
+
+  test "admin cannot demote themselves" do
+    sign_in users(:admin)
+    put user_url(users(:admin)), params: { user: { role: "user" } }, as: :json
+    assert_response :unprocessable_entity
+    assert_equal "admin", users(:admin).reload.role
+  end
+
+  test "user cannot change password without current password" do
+    user = confirmed_user("pwd_test@example.local", password: "Password1!",
+                          role: "user", confirmed_at: Time.current)
+    sign_in user
+    put user_url(user), params: { user: { password: "NewPassword123!" } }, as: :json
+    assert_response :unprocessable_entity
+  end
+
+  test "user can change password with correct current password" do
+    user = confirmed_user("pwd_ok@example.local", password: "Password1!",
+                          role: "user", confirmed_at: Time.current)
+    sign_in user
+    put user_url(user), params: {
+      user: { password: "NewPassword123!" },
+      current_password: "Password1!"
+    }, as: :json
+    assert_response :success
+  end
+
 end
