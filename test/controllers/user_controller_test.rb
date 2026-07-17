@@ -264,4 +264,117 @@ class UserControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "unauthenticated user cannot access users index" do
+    sign_out @user
+    get users_url, as: :json
+    assert_response :unauthorized
+  end
+
+  test "unauthenticated user cannot create user" do
+    sign_out @user
+    post users_create_url, params: {
+      user: { email: "new@user.local", username: "new_user", password: "Password1!" }
+    }, as: :json
+    assert_response :unauthorized
+  end
+
+  test "non-admin cannot create user" do
+    sign_out @user
+    regular = confirmed_user("reg_create@example.local", role: "user",
+                            confirmed_at: Time.current)
+    sign_in regular
+
+    post users_create_url, params: {
+      user: { email: "new@user.local", username: "new_user", password: "Password1!" }
+    }, as: :json
+    assert_response :forbidden
+  end
+
+  test "non-admin cannot show another user" do
+    sign_out @user
+    regular = confirmed_user("reg_show@example.local", role: "user",
+                            confirmed_at: Time.current)
+    sign_in regular
+
+    get user_url(@user_test), as: :json
+    assert_response :forbidden
+  end
+
+  test "non-admin cannot update another user" do
+    sign_out @user
+    regular = confirmed_user("reg_update@example.local", role: "user",
+                            confirmed_at: Time.current)
+    sign_in regular
+
+    put user_url(@user_test), params: { user: { first_name: "Hacked" } }, as: :json
+    assert_response :forbidden
+  end
+
+  test "non-admin user can view own profile" do
+    sign_out @user
+    user = confirmed_user("self_view@example.com", role: "user",
+                          first_name: "Self", last_name: "View",
+                          confirmed_at: Time.current)
+    sign_in user
+
+    get user_url(user), as: :json
+    assert_response :success
+    assert_equal user.id, json_response["id"]
+  end
+
+  test "non-admin user can update own profile" do
+    sign_out @user
+    user = confirmed_user("self_update@example.com", role: "user",
+                          first_name: "Self", last_name: "Update",
+                          confirmed_at: Time.current)
+    sign_in user
+
+    put user_url(user), params: { user: { first_name: "Updated" } }, as: :json
+    assert_response :success
+    assert_equal "Updated", json_response["first_name"]
+  end
+
+  test "non-admin user cannot view other user profile" do
+    sign_out @user
+    user1 = confirmed_user("user1_access@example.com", role: "user",
+                           first_name: "User1", last_name: "Access",
+                           confirmed_at: Time.current)
+    user2 = confirmed_user("user2_access@example.com", role: "user",
+                           first_name: "User2", last_name: "Access",
+                           confirmed_at: Time.current)
+    sign_in user1
+
+    get user_url(user2), as: :json
+    assert_response :forbidden
+  end
+
+  test "admin cannot create user with short password" do
+    assert_no_difference("User.count") do
+      post users_create_url, params: {
+        user: { email: "short@test.com", password: "123", password_confirmation: "123" }
+      }, as: :json
+    end
+    assert_response :unprocessable_entity
+    assert json_response["errors"].any? { |e| e.downcase.include?("password") }
+  end
+
+  test "admin cannot create user with invalid email" do
+    assert_no_difference("User.count") do
+      post users_create_url, params: {
+        user: { email: "not-an-email", password: "password123", password_confirmation: "password123" }
+      }, as: :json
+    end
+    assert_response :unprocessable_entity
+  end
+
+  test "non-admin gets 403 forbidden when accessing other user" do
+    sign_out @user
+    regular = confirmed_user("forbidden_test@example.com", role: "user",
+                             confirmed_at: Time.current)
+    sign_in regular
+
+    get user_url(users(:two)), as: :json
+    assert_response :forbidden
+  end
+
 end
