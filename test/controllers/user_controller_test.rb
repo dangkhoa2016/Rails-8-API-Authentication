@@ -197,4 +197,31 @@ class UserControllerTest < ActionDispatch::IntegrationTest
   ensure
     User.singleton_class.define_method(:find, original_find)
   end
+
+  test "index returns ETag header" do
+    get users_url, as: :json
+    assert_response :success
+    assert response.headers.key?("ETag")
+  end
+
+  test "index returns 304 when ETag matches" do
+    auth_headers = jwt_auth_headers_for(@user)
+
+    get users_url, headers: auth_headers, as: :json
+    etag = response.headers["ETag"]
+
+    get users_url, headers: auth_headers.merge("HTTP_IF_NONE_MATCH" => etag), as: :json
+    assert_response :not_modified
+  end
+
+  test "index returns different ETag for different page" do
+    get users_url, as: :json
+    etag_page1 = response.headers["ETag"]
+
+    get users_url(page: 1, per_page: 1), as: :json
+    etag_different = response.headers["ETag"]
+
+    assert_not_equal etag_page1, etag_different
+  end
+
 end

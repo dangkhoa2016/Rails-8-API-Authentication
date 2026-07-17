@@ -12,18 +12,39 @@ class UsersController < ApplicationController
 
   # GET /users
   def index
-    per_page = (params[:per_page] || 20).to_i
+    per_page = [ (params[:per_page] || 20).to_i, 1 ].max
     per_page = [ per_page, 100 ].min
-    @pagy, @users = pagy(:offset, User.all, limit: per_page, max_limit: 100)
-    render json: {
-      users: @users,
-      meta: pagy_from_metadata(@pagy)
-    }, status: :ok
+    safe_columns = %i[id email username first_name last_name role active confirmed_at created_at unconfirmed_email]
+    @pagy, @users = pagy(
+      User.select(*safe_columns),
+      limit: per_page,
+      max_limit: 100
+    )
+
+    collection_updated_at = User.maximum(:updated_at)&.utc
+    collection_count = User.count
+    last_modified = collection_updated_at || Time.at(0).utc
+    etag = [
+      "users-index",
+      collection_count,
+      collection_updated_at&.iso8601(6) || "0",
+      @pagy.page,
+      @pagy.limit
+    ]
+
+    if stale?(etag: etag, last_modified: last_modified)
+      render json: {
+        users: @users,
+        meta: pagy_from_metadata(@pagy)
+      }, status: :ok
+    end
   end
 
   # GET /users/{username}
   def show
-    render json: @user, status: :ok
+    if stale?(@user)
+      render json: @user, status: :ok
+    end
   end
 
   # POST /users
