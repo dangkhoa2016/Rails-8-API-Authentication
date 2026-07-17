@@ -16,13 +16,26 @@ class Users::PasswordsControllerTest < ActionDispatch::IntegrationTest
     assert json_response["message"].present?
   end
 
-  test "request password reset for non-existent email returns error" do
+  test "request password reset for non-existent email returns success (paranoid mode)" do
+    post user_password_url, params: {
+      user: { email: "nonexistent@example.com" }
+    }, as: :json
+
+    assert_response :ok
+  end
+
+  test "request password reset for non-existent email returns error (paranoid disabled)" do
+    original = Devise.paranoid
+    Devise.paranoid = false
+
     post user_password_url, params: {
       user: { email: "nonexistent@example.com" }
     }, as: :json
 
     assert_response :unprocessable_entity
     assert json_response["errors"].present?
+  ensure
+    Devise.paranoid = original
   end
 
   test "update password with valid token" do
