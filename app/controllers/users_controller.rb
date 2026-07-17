@@ -59,9 +59,19 @@ class UsersController < ApplicationController
 
   # PUT /users/{username}
   def update
+    if @user.id == current_user.id && user_params[:role].present? && user_params[:role] != "admin"
+      return render json: { error: I18n.t("user.cannot_demote_yourself") }, status: :unprocessable_entity
+    end
+
     update_params = user_params.dup
     update_params.delete(:password) if update_params[:password].blank?
     update_params.delete(:password_confirmation) if update_params[:password_confirmation].blank?
+
+    if update_params[:password].present? && @user.id == current_user.id
+      unless @user.valid_password?(params[:current_password])
+        return render json: { error: I18n.t("user.current_password_incorrect") }, status: :unprocessable_entity
+      end
+    end
 
     if @user.update(update_params)
       render json: @user, status: :ok
@@ -96,7 +106,7 @@ class UsersController < ApplicationController
 
     if current_user.admin?
       role = params.dig(:user, :role)
-      filtered_params[:role] = role if role.present?
+      filtered_params[:role] = role if role.present? && User.roles.key?(role)
     end
 
     filtered_params
