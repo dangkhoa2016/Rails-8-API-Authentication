@@ -548,4 +548,92 @@ class UserControllerTest < ActionDispatch::IntegrationTest
     assert_equal "User not found", json_response["error"]
   end
 
+  test "admin can confirm a user via confirm_by_admin" do
+    target = confirmed_user("confirm_coverage@example.local", role: "user",
+                           confirmed_at: nil, active: false)
+
+    put "/users/#{target.id}/confirm_by_admin", as: :json
+    assert_response :success
+    target.reload
+    assert target.confirmed?
+    assert target.active
+  end
+
+  test "confirm_by_admin returns 422 when confirmation fails" do
+    target = confirmed_user("confirm_fail_coverage@example.local", role: "user",
+                           confirmed_at: nil)
+    failing_user = User.find(target.id)
+    def failing_user.confirm(*)
+      errors.add(:base, "Confirm failed")
+      false
+    end
+
+    User.stub(:find, failing_user) do
+      put "/users/#{target.id}/confirm_by_admin", as: :json
+      assert_response :unprocessable_entity
+    end
+  end
+
+  test "unauthenticated user cannot confirm by admin" do
+    sign_out @user
+    put "/users/#{@user_test.id}/confirm_by_admin", as: :json
+    assert_response :unauthorized
+  end
+
+  test "admin can confirm a user" do
+    target = confirmed_user("confirm_target@example.local", role: "user",
+                           confirmed_at: nil)
+
+    put "/users/#{target.id}/confirm_by_admin", as: :json
+    assert_response :success
+    target.reload
+    assert_not_nil target.confirmed_at
+    assert target.active
+  end
+
+  test "confirm_by_admin handles confirm failure" do
+    target = confirmed_user("confirm_fail@example.local", role: "user",
+                           confirmed_at: nil)
+    failing_user = User.find(target.id)
+    def failing_user.confirm(*)
+      errors.add(:base, "Confirm failed")
+      false
+    end
+    User.stub(:find, failing_user) do
+      put "/users/#{target.id}/confirm_by_admin", as: :json
+      assert_response :unprocessable_entity
+    end
+  end
+
+  test "non-admin cannot confirm a user" do
+    sign_out @user
+    regular = confirmed_user("reg_confirm@example.local", role: "user",
+                            confirmed_at: Time.current)
+    sign_in regular
+
+    put "/users/#{@user_test.id}/confirm_by_admin", as: :json
+    assert_response :forbidden
+  end
+
+  test "confirm_by_admin returns not found for missing user" do
+    put "/users/999999/confirm_by_admin", as: :json
+    assert_response :not_found
+  end
+
+  test "admin confirmation uses the confirmable lifecycle" do
+    user = User.create!(
+      email: "admin-confirm@example.local",
+      password: "Password123!",
+      password_confirmation: "Password123!",
+      confirmed_at: nil,
+      active: false
+    )
+
+    put "/users/#{user.id}/confirm_by_admin", as: :json
+
+    assert_response :success
+    user.reload
+    assert user.confirmed?
+    assert user.active?
+  end
 end
