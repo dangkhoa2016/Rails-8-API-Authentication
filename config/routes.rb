@@ -11,6 +11,7 @@ Rails.application.routes.draw do
     get "user/profile" => "users/sessions#show"
     get "user/me" => "users/sessions#show"
     get "user/whoami" => "users/sessions#show"
+    post "users/tokens/refresh" => "users/tokens#refresh"
   end
 
   resources :users, only: [ :index, :update, :destroy, :show ], defaults: { format: :json }

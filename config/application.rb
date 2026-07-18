@@ -30,6 +30,10 @@ module Rails8ApiAuthentication
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
 
+    # Refresh tokens are delivered via HttpOnly cookies, so the cookie
+    # middleware must be mounted even though the app is API-only.
+    config.middleware.use ActionDispatch::Cookies
+
     # Rack::Attack is not auto-loaded in API-only mode; mount it explicitly.
     config.middleware.use Rack::Attack
   end

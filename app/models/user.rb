@@ -27,6 +27,8 @@ class User < ApplicationRecord
     find_by(email: value) || find_by(username: value)
   end
 
+  has_many :refresh_tokens, dependent: :destroy
+
   attr_accessor :token_info
   enum :role, { user: "user", admin: "admin" }
 

@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class Users::SessionsController < Devise::SessionsController
+  include RefreshTokenCookie
+
   skip_before_action :verify_signed_out_user, only: :destroy
   # before_action :configure_sign_in_params, only: [:create]
 
@@ -14,7 +16,16 @@ class Users::SessionsController < Devise::SessionsController
     self.resource = warden.authenticate!(auth_options)
     sign_in(resource_name, resource)
     token = request.env["warden-jwt_auth.token"]
-    render json: { user: resource, token: token }, status: :ok
+
+    raw_refresh_token, _record = RefreshToken.generate_for(
+      resource,
+      user_agent: request.user_agent,
+      ip_address: request.remote_ip
+    )
+
+    write_refresh_token_cookie(raw_refresh_token)
+
+    render json: { user: resource, token: token, refresh_token: raw_refresh_token }, status: :ok
   rescue Warden::NotAuthenticated
     render json: { errors: [ I18n.t("session.invalid_credentials") ] }, status: :unauthorized
   end
@@ -24,6 +35,14 @@ class Users::SessionsController < Devise::SessionsController
     # super
 
     user = current_user if user_signed_in?
+    raw_token = refresh_token_from_request
+
+    if raw_token.present?
+      token_record = RefreshToken.find_by_raw_token(raw_token)
+      token_record&.revoke!
+    end
+    delete_refresh_token_cookie
+
     if user
       sign_out(user)
       render json: { message: I18n.translate("user.signed_out", email: user.email) }, status: :ok
