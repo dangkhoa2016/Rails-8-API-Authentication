@@ -49,6 +49,13 @@ en:
   home:
     welcome: Welcome to Rails 8 API Authentication
 
+  refresh_token:
+    missing: Refresh token is missing
+    invalid: Invalid refresh token
+    reuse_detected: "Security alert: Refresh token reuse detected. All sessions revoked."
+    expired: Refresh token has expired
+    inactive_account: User account is inactive
+
   user:
     deleted: User [%{email}] with id [%{id}] has been deleted
     signed_out: "Your account: %{email} has been signed out successfully"
