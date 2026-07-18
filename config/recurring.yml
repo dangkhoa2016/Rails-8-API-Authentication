@@ -3,6 +3,10 @@ production:
     class: CleanExpiredJwtDenylistsJob
     queue: background
     schedule: every hour
+  clean_expired_refresh_tokens:
+    class: CleanExpiredRefreshTokensJob
+    queue: background
+    schedule: every hour
 
 # production:
 #   periodic_cleanup:
