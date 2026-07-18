@@ -4,11 +4,12 @@ class UsersController < ApplicationController
   include UserAccessControl
 
   # NOTE: index and create are implicitly admin-only.
-  # Non-admin users are rejected by admin_or_current_user?
+  # Non-admin users are rejected by authorize_user_access
   # in UserAccessControl concern (only update/destroy/show are allowed).
 
-  before_action :authorize_user_access
+  before_action :require_authenticated_user
   before_action :find_user, only: %i[show update destroy toggle_status confirm_by_admin]
+  before_action :authorize_user_access
 
   # GET /users
   def index
@@ -117,9 +118,18 @@ class UsersController < ApplicationController
   private
 
   def find_user
-    @user = User.find(params[:id])
-  rescue ActiveRecord::RecordNotFound
-    render json: { error: I18n.t("errors.not_found", model: User.model_name.human) }, status: :not_found
+    value = params[:id].to_s
+    lookup = value.downcase
+
+    @user = User.find_by(id: value) if value.match?(/\A\d+\z/)
+    @user ||= User.find_by(username: lookup)
+    @user ||= User.find_by(email: lookup)
+
+    return if @user
+
+    render json: {
+      error: I18n.t("errors.not_found", model: User.model_name.human)
+    }, status: :not_found
   end
 
   def parse_boolean(value)
