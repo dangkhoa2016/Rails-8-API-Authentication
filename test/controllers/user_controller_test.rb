@@ -189,13 +189,13 @@ class UserControllerTest < ActionDispatch::IntegrationTest
   test "destroy handles failure" do
     user = User.find(@user_test.id)
     user.define_singleton_method(:destroy) { false }
-    original_find = User.method(:find)
-    User.define_singleton_method(:find) { |id| user }
+    original_find_by = User.method(:find_by)
+    User.define_singleton_method(:find_by) { |**| user }
 
     delete user_url(@user_test), as: :json
     assert_response :unprocessable_entity
   ensure
-    User.singleton_class.define_method(:find, original_find)
+    User.singleton_class.define_method(:find_by, original_find_by)
   end
 
   test "index returns ETag header" do
@@ -421,13 +421,13 @@ class UserControllerTest < ActionDispatch::IntegrationTest
   test "toggle_status returns 422 when update fails" do
     user = User.find(@user_test.id)
     user.define_singleton_method(:update) { |**| false }
-    original_find = User.method(:find)
-    User.define_singleton_method(:find) { |id| user }
+    original_find_by = User.method(:find_by)
+    User.define_singleton_method(:find_by) { |**| user }
 
     put "/users/#{@user_test.id}/status", params: { user: { active: false } }, as: :json
     assert_response :unprocessable_entity
   ensure
-    User.singleton_class.define_method(:find, original_find)
+    User.singleton_class.define_method(:find_by, original_find_by)
   end
 
   test "non-admin cannot toggle status" do
@@ -443,13 +443,13 @@ class UserControllerTest < ActionDispatch::IntegrationTest
   test "toggle_status handles update failure" do
     user = User.find(@user_test.id)
     user.define_singleton_method(:update) { |**| false }
-    original_find = User.method(:find)
-    User.define_singleton_method(:find) { |id| user }
+    original_find_by = User.method(:find_by)
+    User.define_singleton_method(:find_by) { |**| user }
 
     put "/users/#{@user_test.id}/status", params: { user: { active: false } }, as: :json
     assert_response :unprocessable_entity
   ensure
-    User.singleton_class.define_method(:find, original_find)
+    User.singleton_class.define_method(:find_by, original_find_by)
   end
 
   test "toggle_status returns not found for missing numeric id" do
@@ -568,7 +568,7 @@ class UserControllerTest < ActionDispatch::IntegrationTest
       false
     end
 
-    User.stub(:find, failing_user) do
+    User.stub(:find_by, failing_user) do
       put "/users/#{target.id}/confirm_by_admin", as: :json
       assert_response :unprocessable_entity
     end
@@ -599,7 +599,7 @@ class UserControllerTest < ActionDispatch::IntegrationTest
       errors.add(:base, "Confirm failed")
       false
     end
-    User.stub(:find, failing_user) do
+    User.stub(:find_by, failing_user) do
       put "/users/#{target.id}/confirm_by_admin", as: :json
       assert_response :unprocessable_entity
     end
@@ -618,6 +618,46 @@ class UserControllerTest < ActionDispatch::IntegrationTest
   test "confirm_by_admin returns not found for missing user" do
     put "/users/999999/confirm_by_admin", as: :json
     assert_response :not_found
+  end
+
+  test "admin can confirm a user by username via confirm_by_admin" do
+    target = confirmed_user("confirm_by_username@example.local", role: "user",
+                           confirmed_at: nil, active: false)
+
+    put "/users/#{target.username}/confirm_by_admin", as: :json
+    assert_response :success
+    target.reload
+    assert target.confirmed?
+    assert target.active
+  end
+
+  test "admin can confirm a user by email via confirm_by_admin" do
+    target = confirmed_user("confirm-by-email@example.local", role: "user",
+                           confirmed_at: nil, active: false)
+
+    put "/users/#{target.email}/confirm_by_admin", as: :json
+    assert_response :success
+    target.reload
+    assert target.confirmed?
+    assert target.active
+  end
+
+  test "toggle_status accepts a username as the route id" do
+    target = confirmed_user("toggle_by_username@example.local", active: false)
+
+    put "/users/#{target.username}/status", params: { user: { active: true } }, as: :json
+    assert_response :success
+    target.reload
+    assert target.active
+  end
+
+  test "toggle_status accepts an email as the route id" do
+    target = confirmed_user("toggle-by-email@example.local", active: false)
+
+    put "/users/#{target.email}/status", params: { user: { active: true } }, as: :json
+    assert_response :success
+    target.reload
+    assert target.active
   end
 
   test "admin confirmation uses the confirmable lifecycle" do
