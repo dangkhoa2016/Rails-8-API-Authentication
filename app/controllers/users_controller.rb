@@ -8,7 +8,7 @@ class UsersController < ApplicationController
   # in UserAccessControl concern (only update/destroy/show are allowed).
 
   before_action :authorize_user_access
-  before_action :find_user, only: %i[show update destroy toggle_status]
+  before_action :find_user, only: %i[show update destroy toggle_status confirm_by_admin]
 
   # GET /users
   def index
@@ -98,6 +98,16 @@ class UsersController < ApplicationController
     end
 
     if @user.update(active: active_value)
+      render json: @user, status: :ok
+    else
+      render json: { errors: @user.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
+  # PUT /users/{id}/confirm_by_admin
+  def confirm_by_admin
+    @user.active = true
+    if @user.confirm
       render json: @user, status: :ok
     else
       render json: { errors: @user.errors.full_messages }, status: :unprocessable_entity
