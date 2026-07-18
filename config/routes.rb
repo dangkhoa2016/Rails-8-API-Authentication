@@ -14,6 +14,7 @@ Rails.application.routes.draw do
   end
 
   resources :users, only: [ :index, :update, :destroy, :show ], defaults: { format: :json }
+  put "users/:id/confirm_by_admin" => "users#confirm_by_admin", constraints: { id: /[^\/?#]+/ }, defaults: { format: :json }
   put "users/:id/status" => "users#toggle_status", constraints: { id: /[^\/?#]+/ }, defaults: { format: :json }
   post "users/create" => "users#create", as: :users_create, defaults: { format: :json }
 
