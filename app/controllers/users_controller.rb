@@ -8,7 +8,7 @@ class UsersController < ApplicationController
   # in UserAccessControl concern (only update/destroy/show are allowed).
 
   before_action :authorize_user_access
-  before_action :find_user, only: %i[show update destroy]
+  before_action :find_user, only: %i[show update destroy toggle_status]
 
   # GET /users
   def index
@@ -89,12 +89,38 @@ class UsersController < ApplicationController
     end
   end
 
+  # PUT /users/{id}/status
+  def toggle_status
+    active_value = parse_boolean(params.dig(:user, :active))
+
+    if active_value.nil?
+      return render json: { error: I18n.t("user.active_must_be_boolean") }, status: :unprocessable_entity
+    end
+
+    if @user.update(active: active_value)
+      render json: @user, status: :ok
+    else
+      render json: { errors: @user.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
   private
 
   def find_user
     @user = User.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: I18n.t("errors.not_found", model: User.model_name.human) }, status: :not_found
+  end
+
+  def parse_boolean(value)
+    case value.to_s.strip.downcase
+    when "true", "yes", "y", "1", "t"
+      true
+    when "false", "no", "n", "0", "f"
+      false
+    else
+      nil
+    end
   end
 
   def user_params
@@ -107,6 +133,8 @@ class UsersController < ApplicationController
     if current_user.admin?
       role = params.dig(:user, :role)
       filtered_params[:role] = role if role.present? && User.roles.key?(role)
+      active_value = params.dig(:user, :active)
+      filtered_params[:active] = parse_boolean(active_value) unless active_value.nil?
     end
 
     filtered_params
