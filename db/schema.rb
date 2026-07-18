@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_17_112646) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_18_184913) do
   create_table "jwt_denylists", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "exp"
@@ -18,6 +18,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_17_112646) do
     t.datetime "updated_at", null: false
     t.index ["jti", "exp"], name: "index_jwt_denylists_on_jti_and_exp"
     t.index ["jti"], name: "index_jwt_denylists_on_jti", unique: true
+  end
+
+  create_table "refresh_tokens", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "expires_at", null: false
+    t.string "family_id", null: false
+    t.string "ip_address"
+    t.datetime "revoked_at"
+    t.string "token_digest", null: false
+    t.datetime "updated_at", null: false
+    t.string "user_agent"
+    t.integer "user_id", null: false
+    t.index ["expires_at"], name: "index_refresh_tokens_on_expires_at"
+    t.index ["family_id"], name: "index_refresh_tokens_on_family_id"
+    t.index ["token_digest"], name: "index_refresh_tokens_on_token_digest", unique: true
+    t.index ["user_id"], name: "index_refresh_tokens_on_user_id"
   end
 
   create_table "users", force: :cascade do |t|
@@ -54,4 +70,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_17_112646) do
     t.index ["unlock_token"], name: "index_users_on_unlock_token", unique: true
     t.index ["username"], name: "index_users_on_username", unique: true
   end
+
+  add_foreign_key "refresh_tokens", "users"
 end
