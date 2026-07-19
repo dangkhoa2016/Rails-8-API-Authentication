@@ -18,14 +18,15 @@ curl -X POST -H "Content-Type: application/json" -d '{
   "message": "A message with a confirmation link has been sent to your email address. Please follow the link to activate your account.",
   "user": {
     "id": 2,
+    "active": true,
+    "avatar": null,
+    "created_at": "2025-01-19T13:27:43.182Z",
     "email": "user@example.com",
-    "username": "user1",
     "first_name": "",
     "last_name": "",
-    "avatar": null,
     "role": "user",
-    "created_at": "2025-01-19T13:27:43.182Z",
-    "updated_at": "2025-01-19T13:27:43.182Z"
+    "updated_at": "2025-01-19T13:27:43.182Z",
+    "username": "user1"
   }
 }
 # http://localhost:4000/users/confirmation?confirmation_token=MjRUbw87mVdKk8jCRH8h
@@ -53,6 +54,7 @@ curl -X POST -H "Content-Type: application/json" -d '{
 curl -X GET "$BASE_URL/users/confirmation?confirmation_token=SgoszqA3BsrLpyNYqvem" -i
 {
   "id": 2,
+  "active": true,
   "email": "user@example.com",
   "username": "user1",
   "first_name": "",
@@ -71,7 +73,7 @@ curl -X POST -H "Content-Type: application/json" -d '{
   }
 }' "$BASE_URL/users/sign_in" -i
 
-HTTP/1.1 201 Created
+HTTP/1.1 200 OK
 x-frame-options: SAMEORIGIN
 x-xss-protection: 0
 x-content-type-options: nosniff
@@ -80,14 +82,30 @@ referrer-policy: strict-origin-when-cross-origin
 location: /
 content-type: application/json; charset=utf-8
 authorization: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}
+set-cookie: refresh_token=<your-refresh-token>; path=/; HttpOnly; SameSite=Lax
 etag: W/"f8df4ddaed8726a8beed27240b4408ca"
 cache-control: max-age=0, private, must-revalidate
 x-request-id: 60a01b68-f862-467c-8a34-1181d2fba3ca
 x-runtime: 0.257309
 server-timing: start_processing.action_controller;dur=0.01, sql.active_record;dur=3.41, instantiation.active_record;dur=0.07, start_transaction.active_record;dur=0.01, transaction.active_record;dur=4.30, process_action.action_controller;dur=251.65
-Content-Length: 193
+Content-Length: 485
 
-{"id":2,"email":"user@example.com","username":"user1","first_name":"","last_name":"","avatar":null,"role":"user","created_at":"2025-01-16T17:32:30.315Z","updated_at":"2025-01-17T08:34:10.527Z"}
+{
+  "user": {
+    "id": 2,
+    "active": true,
+    "avatar": null,
+    "created_at": "2025-01-16T17:32:30.315Z",
+    "email": "user@example.com",
+    "first_name": "",
+    "last_name": "",
+    "role": "user",
+    "updated_at": "2025-01-17T08:34:10.527Z",
+    "username": "user1"
+  },
+  "token": "${TEST_JWT_TOKEN:-<your-jwt-token-here>}",
+  "refresh_token": "<your-refresh-token>"
+}
 
 # ---- Sign In with invalid password ----
 curl -X POST -H "Content-Type: application/json" -d '{
@@ -115,6 +133,7 @@ api -X GET "$BASE_URL/user/profile" | jq .
 {
   "user": {
     "id": 2,
+    "active": true,
     "email": "user@example.com",
     "username": "user1",
     "first_name": "",
@@ -139,6 +158,7 @@ api -X GET "$BASE_URL/user/me" | jq .
 {
   "user": {
     "id": 2,
+    "active": true,
     "email": "user@example.com",
     "username": "user1",
     "first_name": "",
@@ -163,6 +183,7 @@ api -X GET "$BASE_URL/user/whoami" | jq .
 {
   "user": {
     "id": 2,
+    "active": true,
     "email": "user@example.com",
     "username": "user1",
     "first_name": "",
@@ -204,4 +225,49 @@ curl -s -X GET -H "Content-Type: application/json" \
     "expired": true,
     "jti": "459a338f-0738-42db-886f-79f3519b8798"
   }
+}
+
+# ---- 8 - Refresh Access Token (rotation) ----
+# Use any ONE of the three transports below. Each call rotates the refresh
+# token and returns a fresh access token.
+
+# 8a - Refresh via X-Refresh-Token header
+curl -s -X POST -H "Content-Type: application/json" \
+  -H "X-Refresh-Token: <your-refresh-token>" \
+  "$BASE_URL/users/tokens/refresh" | jq .
+
+# 8b - Refresh via JSON body
+curl -s -X POST -H "Content-Type: application/json" -d '{
+  "refresh_token": "<your-refresh-token>"
+}' "$BASE_URL/users/tokens/refresh" | jq .
+
+# 8c - Refresh via cookie
+curl -s -X POST -H "Content-Type: application/json" \
+  -b "refresh_token=<your-refresh-token>" \
+  "$BASE_URL/users/tokens/refresh" | jq .
+
+# Response:
+{
+  "user": {
+    "id": 2,
+    "active": true,
+    "avatar": null,
+    "created_at": "2025-01-16T17:32:30.315Z",
+    "email": "user@example.com",
+    "first_name": "",
+    "last_name": "",
+    "role": "user",
+    "updated_at": "2025-01-17T09:00:00.000Z",
+    "username": "user1"
+  },
+  "access_token": "<your-new-access-token>",
+  "refresh_token": "<your-new-refresh-token>"
+}
+
+# 8d - Reuse of an already-rotated token -> whole family is revoked
+curl -s -X POST -H "Content-Type: application/json" \
+  -H "X-Refresh-Token: <your-old-refresh-token>" \
+  "$BASE_URL/users/tokens/refresh" | jq .
+{
+  "error": "Security alert: Refresh token reuse detected. All sessions revoked."
 }
