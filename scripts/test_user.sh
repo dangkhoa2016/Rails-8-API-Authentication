@@ -27,6 +27,30 @@ BASE_URL="${API_BASE_URL:-http://localhost:4000}"
 USER_EMAIL="${USER_EMAIL:-user@example.com}"
 USER_PASSWORD="${USER_PASSWORD:-password@123A}"
 
+COOKIE_JAR=$(mktemp)
+trap 'rm -f "$COOKIE_JAR"' EXIT
+
+refresh_via_cookie() {
+  curl -s -w "\n%{http_code}" -X POST \
+    -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
+    "$BASE_URL/users/tokens/refresh"
+}
+
+refresh_via_header() {
+  local token="$1"
+  curl -s -w "\n%{http_code}" -X POST \
+    -H "X-Refresh-Token: $token" \
+    "$BASE_URL/users/tokens/refresh"
+}
+
+refresh_via_body() {
+  local token="$1"
+  curl -s -w "\n%{http_code}" -X POST \
+    -H "Content-Type: application/json" \
+    -d "{\"refresh_token\": \"$token\"}" \
+    "$BASE_URL/users/tokens/refresh"
+}
+
 # ---- Colors ----
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -55,12 +79,23 @@ assert_status() {
   fi
 }
 
+assert_body_contains() {
+  local label="$1" needle="$2" body="$3"
+  if echo "$body" | grep -q "$needle"; then
+    echo -e "  ${GREEN}✓${NC} $label"
+    passed=$((passed + 1))
+  else
+    echo -e "  ${RED}✗${NC} $label (expected body to contain \"$needle\", got: $body)"
+    failed=$((failed + 1))
+  fi
+}
+
 # =====================================================================
 #  1 - Sign In
 # =====================================================================
 section "1. Sign In as Regular User"
 
-SIGN_IN_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+SIGN_IN_RESPONSE=$(curl -s -w "\n%{http_code}" -c "$COOKIE_JAR" -X POST \
   -H "Content-Type: application/json" \
   -d "{
     \"user\": {
@@ -95,6 +130,14 @@ if [ -z "$TOKEN" ]; then
 fi
 
 echo -e "  ${GREEN}Token obtained${NC}: ${TOKEN:0:30}..."
+
+REFRESH_TOKEN=$(echo "$SIGN_IN_BODY" | jq -r '.refresh_token // empty')
+
+if [ -z "$REFRESH_TOKEN" ]; then
+  echo -e "  ${RED}No refresh_token returned at sign-in. Aborting.${NC}"
+  exit 1
+fi
+echo -e "  ${GREEN}Refresh token obtained${NC}: ${REFRESH_TOKEN:0:30}..."
 
 # Shortcut for authenticated requests
 api() {
@@ -211,12 +254,89 @@ HTTP=$(api_status -X PUT -d "{
 assert_status "PUT /users/$OTHER_ID (update other, expect 403)" "403" "$HTTP"
 
 # =====================================================================
-#  8 - Sign Out
+# 8 - Refresh Token Flow
 # =====================================================================
-section "8. Sign Out"
+section "8. Refresh Token Flow"
+
+# a. Refresh via HttpOnly cookie (cookie jar) -> RT1
+RT_RESP=$(refresh_via_cookie)
+RT_HTTP=$(echo "$RT_RESP" | tail -1)
+assert_status "Refresh via cookie jar" "200" "$RT_HTTP"
+RT_BODY=$(echo "$RT_RESP" | sed '$d')
+assert_body_contains "cookie refresh returns access_token" "access_token" "$RT_BODY"
+RT1=$(echo "$RT_BODY" | jq -r '.refresh_token // empty')
+echo -e "  ${YELLOW}Rotated refresh token (cookie):${NC} ${RT1:0:30}..."
+
+# b. Refresh via X-Refresh-Token header -> RT2
+RT_RESP=$(refresh_via_header "$RT1")
+RT_HTTP=$(echo "$RT_RESP" | tail -1)
+assert_status "Refresh via X-Refresh-Token header" "200" "$RT_HTTP"
+RT_BODY=$(echo "$RT_RESP" | sed '$d')
+RT2=$(echo "$RT_BODY" | jq -r '.refresh_token // empty')
+echo -e "  ${YELLOW}Rotated refresh token (header):${NC} ${RT2:0:30}..."
+
+# c. Refresh via JSON body -> RT3
+RT_RESP=$(refresh_via_body "$RT2")
+RT_HTTP=$(echo "$RT_RESP" | tail -1)
+assert_status "Refresh via JSON body" "200" "$RT_HTTP"
+RT_BODY=$(echo "$RT_RESP" | sed '$d')
+RT3=$(echo "$RT_BODY" | jq -r '.refresh_token // empty')
+echo -e "  ${YELLOW}Rotated refresh token (body):${NC} ${RT3:0:30}..."
+
+# d. Reuse detection: RT2 already revoked by rotation in step c
+RT_RESP=$(refresh_via_body "$RT2")
+RT_HTTP=$(echo "$RT_RESP" | tail -1)
+assert_status "Reuse of rotated token (expect 401)" "401" "$RT_HTTP"
+RT_BODY=$(echo "$RT_RESP" | sed '$d')
+assert_body_contains "reuse detection message" "reuse detected" "$RT_BODY"
+
+# e. Family revoked: RT3 was revoked together with its family in step d
+RT_RESP=$(refresh_via_body "$RT3")
+RT_HTTP=$(echo "$RT_RESP" | tail -1)
+assert_status "Family token revoked (expect 401)" "401" "$RT_HTTP"
+
+# f. Missing token
+RT_RESP=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/users/tokens/refresh")
+RT_HTTP=$(echo "$RT_RESP" | tail -1)
+assert_status "Missing refresh token (expect 401)" "401" "$RT_HTTP"
+RT_BODY=$(echo "$RT_RESP" | sed '$d')
+assert_body_contains "missing token message" "Refresh token is missing" "$RT_BODY"
+
+# g. Invalid token
+RT_RESP=$(refresh_via_body "garbage-token")
+RT_HTTP=$(echo "$RT_RESP" | tail -1)
+assert_status "Invalid refresh token (expect 401)" "401" "$RT_HTTP"
+RT_BODY=$(echo "$RT_RESP" | sed '$d')
+assert_body_contains "invalid token message" "Invalid refresh token" "$RT_BODY"
+
+# =====================================================================
+# 9 - Sign Out
+# =====================================================================
+section "9. Sign Out"
 
 HTTP=$(api_status -X DELETE "$BASE_URL/users/sign_out")
 assert_status "DELETE /users/sign_out" "200" "$HTTP"
+
+# Sign out revokes the refresh token: re-sign-in, sign out with cookie, then refresh fails
+RE_SIGN_IN=$(curl -s -c "$COOKIE_JAR" -X POST \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"user\": {
+      \"email\": \"$USER_EMAIL\",
+      \"password\": \"$USER_PASSWORD\"
+    }
+  }" "$BASE_URL/users/sign_in")
+RE_TOKEN=$(echo "$RE_SIGN_IN" | jq -r '.token // empty')
+RE_REFRESH=$(echo "$RE_SIGN_IN" | jq -r '.refresh_token // empty')
+
+HTTP=$(curl -s -w "\n%{http_code}" -X DELETE -b "$COOKIE_JAR" \
+  -H "Authorization: Bearer $RE_TOKEN" \
+  "$BASE_URL/users/sign_out" | tail -1)
+assert_status "Sign out with refresh cookie" "200" "$HTTP"
+
+RT_RESP=$(refresh_via_body "$RE_REFRESH")
+RT_HTTP=$(echo "$RT_RESP" | tail -1)
+assert_status "Refresh after sign out (expect 401)" "401" "$RT_HTTP"
 
 # =====================================================================
 #  Summary
