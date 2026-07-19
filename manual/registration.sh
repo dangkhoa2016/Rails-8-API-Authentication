@@ -19,14 +19,15 @@ curl -X POST -H "Content-Type: application/json" -d '{
   "message": "A message with a confirmation link has been sent to your email address. Please follow the link to activate your account.",
   "user": {
     "id": 2,
+    "active": true,
+    "avatar": null,
+    "created_at": "2025-01-19T13:27:43.182Z",
     "email": "user@example.com",
-    "username": "user1",
     "first_name": "",
     "last_name": "",
-    "avatar": null,
     "role": "user",
-    "created_at": "2025-01-19T13:27:43.182Z",
-    "updated_at": "2025-01-19T13:27:43.182Z"
+    "updated_at": "2025-01-19T13:27:43.182Z",
+    "username": "user1"
   }
 }
 # http://localhost:4000/users/confirmation?confirmation_token=MjRUbw87mVdKk8jCRH8h
@@ -39,6 +40,8 @@ curl -X POST -H "Content-Type: application/json" -d '{
   }
 }' "$BASE_URL/users/sign_in" -i
 # ${TEST_JWT_TOKEN:-<your-jwt-token-here>}
+# Response: {"user": {...}, "token": "<access-token>", "refresh_token": "<refresh-token>"}
+# The refresh token is also set as an HttpOnly cookie named "refresh_token".
 
 # ---- 2 - Get user's profile edit form ----
 api -X GET "$BASE_URL/users/edit" | jq .
@@ -55,15 +58,16 @@ api -X PUT -d '{
 {
   "message": "Your account has been updated successfully.",
   "user": {
+    "id": 2,
+    "active": true,
+    "avatar": null,
+    "email": "user@example.com",
     "first_name": "User 1",
     "last_name": "Name 1",
-    "username": "user1",
-    "email": "user@example.com",
-    "id": 2,
-    "avatar": null,
     "role": "user",
     "created_at": "2025-01-19T08:01:33.378Z",
-    "updated_at": "2025-01-19T09:33:01.862Z"
+    "updated_at": "2025-01-19T09:33:01.862Z",
+    "username": "user1"
   }
 }
 
@@ -77,16 +81,17 @@ api -X PUT -d '{
 {
   "message": "Your account has been updated successfully.",
   "user": {
-    "email": "user@example.com",
     "id": 2,
-    "username": "user1",
+    "active": true,
+    "avatar": null,
+    "email": "user@example.com",
     "first_name": "User 1",
     "last_name": "Name 1",
-    "avatar": null,
     "role": "user",
     "created_at": "2025-01-19T08:01:33.378Z",
+    "unconfirmed_email": "test_updated@local.test",
     "updated_at": "2025-01-19T09:44:42.161Z",
-    "unconfirmed_email": "test_updated@local.test"
+    "username": "user1"
   }
 }
 
@@ -96,13 +101,14 @@ api -X DELETE "$BASE_URL/users" | jq .
   "message": "Bye! Your account has been successfully cancelled. We hope to see you again soon.",
   "user": {
     "id": 2,
+    "active": true,
+    "avatar": null,
     "email": "user@example.com",
-    "username": "user1",
     "first_name": "User 1",
     "last_name": "Name 1",
-    "avatar": null,
     "role": "user",
     "created_at": "2025-01-19T08:01:33.378Z",
-    "updated_at": "2025-01-19T12:31:38.073Z"
+    "updated_at": "2025-01-19T12:31:38.073Z",
+    "username": "user1"
   }
 }
