@@ -17,6 +17,8 @@ curl -X POST -H "Content-Type: application/json" -d '{
   }
 }' "$BASE_URL/users/sign_in" -i
 # eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM4NDgyNjY2LCJleHAiOjE3Mzg0ODYyNjYsImp0aSI6IjYyMDk0MjA2LWQ4YjMtNDUxYS1hY2YzLTI0MDBmNmVjZDIxOSJ9.l_Y5BcoeAV8vYWcxLk8tcKiWpYRgAGFFw-JqM4pUyms
+# Response: {"user": {...}, "token": "<access-token>", "refresh_token": "<refresh-token>"}
+# export USER_TOKEN="<access-token>" ; export USER_REFRESH_TOKEN="<refresh-token>"
 
 # ---- 2 - Sign In as role: admin ----
 curl -X POST -H "Content-Type: application/json" -d '{
@@ -26,6 +28,8 @@ curl -X POST -H "Content-Type: application/json" -d '{
   }
 }' "$BASE_URL/users/sign_in" -i
 # eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM4NDgyNjg0LCJleHAiOjE3Mzg0ODYyODQsImp0aSI6IjQxZDA1NmU1LTM5NWQtNDYwOS04ZDNmLTkwNDkxZDI2NDc0ZCJ9.14j0iDRsGF2YpO1WrAa_49srpK0Y77TWp0V3wURSJMU
+# Response: {"user": {...}, "token": "<access-token>", "refresh_token": "<refresh-token>"}
+# export ADMIN_TOKEN="<access-token>" ; export ADMIN_REFRESH_TOKEN="<refresh-token>"
 
 # ---- 3 - Get /user/profile as role: user ----
 curl -s -X GET -H "Content-Type: application/json" \
@@ -69,30 +73,40 @@ curl -s -X GET -H "Content-Type: application/json" \
 curl -s -X GET -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   "$BASE_URL/users" | jq .
-[
-  {
-    "id": 1,
-    "email": "admin@admin.admin",
-    "username": "admin",
-    "first_name": "Admin",
-    "last_name": "Master",
-    "avatar": null,
-    "role": "admin",
-    "created_at": "2025-01-17T11:03:25.018Z",
-    "updated_at": "2025-02-01T14:29:59.900Z"
-  },
-  {
-    "id": 2,
-    "email": "user@example.com",
-    "username": "user1",
-    "first_name": "",
-    "last_name": "",
-    "avatar": null,
-    "role": "user",
-    "created_at": "2025-01-17T12:36:46.006Z",
-    "updated_at": "2025-01-19T07:51:09.661Z"
+{
+  "users": [
+    {
+      "id": 1,
+      "active": true,
+      "email": "admin@admin.admin",
+      "username": "admin",
+      "first_name": "Admin",
+      "last_name": "Master",
+      "avatar": null,
+      "role": "admin",
+      "created_at": "2025-01-17T11:03:25.018Z",
+      "updated_at": "2025-02-01T14:29:59.900Z"
+    },
+    {
+      "id": 2,
+      "active": true,
+      "email": "user@example.com",
+      "username": "user1",
+      "first_name": "",
+      "last_name": "",
+      "avatar": null,
+      "role": "user",
+      "created_at": "2025-01-17T12:36:46.006Z",
+      "updated_at": "2025-01-19T07:51:09.661Z"
+    }
+  ],
+  "meta": {
+    "current_page": 1,
+    "per_page": 20,
+    "total_count": 2,
+    "total_pages": 1
   }
-]
+}
 
 # ---- 11 - try to access /users/1 as role: user ----
 curl -s -X GET -H "Content-Type: application/json" \
@@ -108,6 +122,7 @@ curl -s -X GET -H "Content-Type: application/json" \
   "$BASE_URL/users/1" | jq .
 {
   "id": 1,
+  "active": true,
   "email": "admin@admin.admin",
   "username": "admin",
   "first_name": "Admin",
@@ -124,6 +139,7 @@ curl -s -X GET -H "Content-Type: application/json" \
   "$BASE_URL/users/2" | jq .
 {
   "id": 2,
+  "active": true,
   "email": "user@example.com",
   "username": "user1",
   "first_name": "",
@@ -140,6 +156,7 @@ curl -s -X GET -H "Content-Type: application/json" \
   "$BASE_URL/users/2" | jq .
 {
   "id": 2,
+  "active": true,
   "email": "user@example.com",
   "username": "user1",
   "first_name": "",
@@ -210,6 +227,7 @@ curl -s -X POST -H "Content-Type: application/json" -d '{
   | jq .
 {
   "id": 4,
+  "active": true,
   "email": "test1@local.test",
   "username": "test1_user",
   "first_name": "",
@@ -231,8 +249,9 @@ curl -s -X PUT -H "Content-Type: application/json" -d '{
   -H "Authorization: Bearer $USER_TOKEN" \
   | jq .
 {
-  "email": "user@example.com",
   "id": 2,
+  "active": true,
+  "email": "user@example.com",
   "username": "user1",
   "first_name": "",
   "last_name": "",
@@ -254,8 +273,9 @@ curl -s -X PUT -H "Content-Type: application/json" -d '{
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   | jq .
 {
-  "email": "user@example.com",
   "id": 2,
+  "active": true,
+  "email": "user@example.com",
   "username": "user1",
   "first_name": "",
   "last_name": "",
@@ -280,4 +300,49 @@ curl -s -X DELETE -H "Content-Type: application/json" \
   "$BASE_URL/users/2" | jq .
 {
   "errors": "User not found"
+}
+
+# ---- 25 - Refresh Access Token (rotation) ----
+# Use the refresh token captured at sign-in. Each call rotates it and returns
+# a fresh access token.
+
+# 25a - Refresh via X-Refresh-Token header
+curl -s -X POST -H "Content-Type: application/json" \
+  -H "X-Refresh-Token: $USER_REFRESH_TOKEN" \
+  "$BASE_URL/users/tokens/refresh" | jq .
+
+# 25b - Refresh via JSON body
+curl -s -X POST -H "Content-Type: application/json" -d "{
+  \"refresh_token\": \"$USER_REFRESH_TOKEN\"
+}" "$BASE_URL/users/tokens/refresh" | jq .
+
+# 25c - Refresh via cookie
+curl -s -X POST -H "Content-Type: application/json" \
+  -b "refresh_token=$USER_REFRESH_TOKEN" \
+  "$BASE_URL/users/tokens/refresh" | jq .
+
+# Response:
+{
+  "user": {
+    "id": 2,
+    "active": true,
+    "avatar": null,
+    "email": "user@example.com",
+    "first_name": "",
+    "last_name": "",
+    "role": "user",
+    "username": "user1",
+    "created_at": "2025-01-17T12:36:46.006Z",
+    "updated_at": "2025-01-19T08:46:41.150Z"
+  },
+  "access_token": "<your-new-access-token>",
+  "refresh_token": "<your-new-refresh-token>"
+}
+
+# 25d - Reuse of an already-rotated token -> whole family is revoked
+curl -s -X POST -H "Content-Type: application/json" \
+  -H "X-Refresh-Token: $USER_REFRESH_TOKEN" \
+  "$BASE_URL/users/tokens/refresh" | jq .
+{
+  "error": "Security alert: Refresh token reuse detected. All sessions revoked."
 }
