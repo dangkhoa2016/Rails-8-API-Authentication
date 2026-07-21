@@ -1,41 +1,124 @@
-# SQLite. Versions 3.8.0 and up are supported.
-#   gem install sqlite3
+# PostgreSQL configuration for Rails
 #
-#   Ensure the SQLite 3 gem is defined in your Gemfile
-#   gem "sqlite3"
+# Timeout strategy:
+#   development: relaxed enough for debugging / local work
+#   test:        more tolerant to schema setup and slower CI
+#   production:  fail fast for web/API workloads
 #
-default: &default
-  adapter: sqlite3
-  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
-  timeout: 5000
+# Every important value can still be overridden with ENV variables.
 
+default: &default
+  adapter: postgresql
+  encoding: unicode
+
+  host: <%= ENV.fetch("POSTGRES_HOST", "127.0.0.1") %>
+  port: <%= ENV.fetch("POSTGRES_PORT", 5432) %>
+  username: <%= ENV.fetch("POSTGRES_USER", "postgres") %>
+  password: <%= ENV["POSTGRES_PASSWORD"] %>
+
+# -----------------------------------------------------------------------------
+# Development
+# -----------------------------------------------------------------------------
 development:
   <<: *default
-  database: storage/development.sqlite3
 
-# Warning: The database defined as "test" will be erased and
-# re-generated from your development database when you run "rake".
-# Do not set this db to the same as development or production.
+  database: <%= ENV.fetch("POSTGRES_DB", "rails_8_api_authentication_development") %>
+
+  # Local development normally has light concurrency.
+  pool: <%= ENV.fetch("DEVELOPMENT_DB_POOL", ENV.fetch("RAILS_MAX_THREADS", 5)) %>
+
+  # Maximum time to establish a new PostgreSQL connection.
+  connect_timeout: <%= ENV.fetch("DEVELOPMENT_DB_CONNECT_TIMEOUT", 5) %>
+
+  # Maximum time Rails waits for a free connection from its pool.
+  checkout_timeout: <%= ENV.fetch("DEVELOPMENT_DB_CHECKOUT_TIMEOUT", 5) %>
+
+  # More relaxed than production so debugging, console queries,
+  # local migrations, etc. are less likely to be cancelled unexpectedly.
+  variables:
+    statement_timeout: <%= ENV.fetch("DEVELOPMENT_DB_STATEMENT_TIMEOUT", "15000ms") %>
+
+# -----------------------------------------------------------------------------
+# Test
+# -----------------------------------------------------------------------------
 test:
   <<: *default
-  database: storage/test.sqlite3
 
+  database: <%= ENV.fetch("POSTGRES_TEST_DB", "rails_8_api_authentication_test") %>
 
-# Store production database in the storage/ directory, which by default
-# is mounted as a persistent Docker volume in config/deploy.yml.
+  # Can be increased independently when using parallel tests / CI.
+  pool: <%= ENV.fetch("TEST_DB_POOL", ENV.fetch("RAILS_MAX_THREADS", 5)) %>
+
+  connect_timeout: <%= ENV.fetch("TEST_DB_CONNECT_TIMEOUT", 5) %>
+
+  # CI can temporarily have more connection contention than local/prod.
+  checkout_timeout: <%= ENV.fetch("TEST_DB_CHECKOUT_TIMEOUT", 10) %>
+
+  # Test setup, schema loading, fixtures and integration tests can legitimately
+  # be slower than ordinary production web requests.
+  variables:
+    statement_timeout: <%= ENV.fetch("TEST_DB_STATEMENT_TIMEOUT", "30000ms") %>
+
+# -----------------------------------------------------------------------------
+# Production
+# -----------------------------------------------------------------------------
 production:
+  # Main application database.
   primary:
     <<: *default
-    database: storage/production.sqlite3
+
+    # Explicit URL makes it clear that production credentials/host/database
+    # come from the deployment environment rather than source control.
+    url: <%= ENV["DATABASE_URL"] %>
+
+    pool: <%= ENV.fetch("PRIMARY_DB_POOL", ENV.fetch("PRODUCTION_DB_POOL", ENV.fetch("RAILS_MAX_THREADS", 5))) %>
+    connect_timeout: <%= ENV.fetch("PRIMARY_DB_CONNECT_TIMEOUT", ENV.fetch("PRODUCTION_DB_CONNECT_TIMEOUT", 5)) %>
+    checkout_timeout: <%= ENV.fetch("PRIMARY_DB_CHECKOUT_TIMEOUT", ENV.fetch("PRODUCTION_DB_CHECKOUT_TIMEOUT", 5)) %>
+
+    variables:
+      # Fail fast for unexpectedly expensive web/API SQL.
+      statement_timeout: <%= ENV.fetch("PRIMARY_DB_STATEMENT_TIMEOUT", ENV.fetch("PRODUCTION_DB_STATEMENT_TIMEOUT", ENV.fetch("POSTGRES_STATEMENT_TIMEOUT", "5000ms"))) %>
+
+  # Solid Cache database.
   cache:
     <<: *default
-    database: storage/production_cache.sqlite3
+
+    url: <%= ENV["CACHE_DATABASE_URL"] %>
     migrations_paths: db/cache_migrate
+
+    pool: <%= ENV.fetch("CACHE_DB_POOL", ENV.fetch("PRODUCTION_DB_POOL", ENV.fetch("RAILS_MAX_THREADS", 5))) %>
+    connect_timeout: <%= ENV.fetch("CACHE_DB_CONNECT_TIMEOUT", ENV.fetch("PRODUCTION_DB_CONNECT_TIMEOUT", 5)) %>
+    checkout_timeout: <%= ENV.fetch("CACHE_DB_CHECKOUT_TIMEOUT", ENV.fetch("PRODUCTION_DB_CHECKOUT_TIMEOUT", 5)) %>
+
+    variables:
+      statement_timeout: <%= ENV.fetch("CACHE_DB_STATEMENT_TIMEOUT", ENV.fetch("PRODUCTION_DB_STATEMENT_TIMEOUT", "5000ms")) %>
+
+  # Solid Queue database.
   queue:
     <<: *default
-    database: storage/production_queue.sqlite3
+
+    url: <%= ENV["QUEUE_DATABASE_URL"] %>
     migrations_paths: db/queue_migrate
+
+    pool: <%= ENV.fetch("QUEUE_DB_POOL", ENV.fetch("PRODUCTION_DB_POOL", ENV.fetch("RAILS_MAX_THREADS", 5))) %>
+    connect_timeout: <%= ENV.fetch("QUEUE_DB_CONNECT_TIMEOUT", ENV.fetch("PRODUCTION_DB_CONNECT_TIMEOUT", 5)) %>
+    checkout_timeout: <%= ENV.fetch("QUEUE_DB_CHECKOUT_TIMEOUT", ENV.fetch("PRODUCTION_DB_CHECKOUT_TIMEOUT", 5)) %>
+
+    variables:
+      # Queue maintenance / housekeeping may occasionally be a little heavier
+      # than ordinary cache/cable SQL, so give it a slightly larger guardrail.
+      statement_timeout: <%= ENV.fetch("QUEUE_DB_STATEMENT_TIMEOUT", ENV.fetch("PRODUCTION_DB_STATEMENT_TIMEOUT", "10000ms")) %>
+
+  # Solid Cable database.
   cable:
     <<: *default
-    database: storage/production_cable.sqlite3
+
+    url: <%= ENV["CABLE_DATABASE_URL"] %>
     migrations_paths: db/cable_migrate
+
+    pool: <%= ENV.fetch("CABLE_DB_POOL", ENV.fetch("PRODUCTION_DB_POOL", ENV.fetch("RAILS_MAX_THREADS", 5))) %>
+    connect_timeout: <%= ENV.fetch("CABLE_DB_CONNECT_TIMEOUT", ENV.fetch("PRODUCTION_DB_CONNECT_TIMEOUT", 5)) %>
+    checkout_timeout: <%= ENV.fetch("CABLE_DB_CHECKOUT_TIMEOUT", ENV.fetch("PRODUCTION_DB_CHECKOUT_TIMEOUT", 5)) %>
+
+    variables:
+      statement_timeout: <%= ENV.fetch("CABLE_DB_STATEMENT_TIMEOUT", ENV.fetch("PRODUCTION_DB_STATEMENT_TIMEOUT", "5000ms")) %>
