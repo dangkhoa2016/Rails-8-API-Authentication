@@ -44,6 +44,13 @@ STATUS_TSV="$RUN_DIR/status.tsv"
 DETAILS_MD="$RUN_DIR/details.md"
 REPORT_MD="$RUN_DIR/report.md"
 
+LOCK_FILE="/tmp/test_ruby_versions.lock"
+exec 200>"$LOCK_FILE"
+if ! flock -n 200; then
+  echo "ERROR: Another instance of test_ruby_versions.sh is already running." >&2
+  exit 1
+fi
+
 if (($# > 0)); then
   RUBY_VERSIONS=("$@")
 else
@@ -159,6 +166,45 @@ check_prerequisites() {
   }
 
   ((missing == 0)) || exit 2
+}
+
+# Detect the ActiveRecord adapter declared in config/database.yml.
+database_adapter() {
+  grep -m1 -E '^\s*adapter:' "$PROJECT_DIR/config/database.yml" \
+    | sed -E 's/^\s*adapter:[[:space:]]*([^#[:space:]]+).*/\1/'
+}
+
+# Reset the database so every Ruby version runs against a clean slate.
+# SQLite: remove the database files; the next db:prepare recreates them.
+# PostgreSQL: drop and re-prepare all databases, then seed the admin account.
+# Requires that .env has already been sourced (production DATABASE_URLs).
+reset_database() {
+  local version="$1" setup_log="${2:-/dev/null}" adapter
+  adapter=$(database_adapter)
+
+  rm -f "$PROJECT_DIR"/Gemfile.lock
+
+  if [[ "$adapter" == "sqlite3" ]]; then
+    rm -f "$PROJECT_DIR"/storage/*.sqlite3
+    return 0
+  fi
+
+  if [[ "$adapter" != "postgresql" ]]; then
+    log "Ruby $version: adapter not supported: $adapter"
+    return 1
+  fi
+
+  log "Ruby $version: reset PostgreSQL databases (bundle install + db:reset)"
+  (
+    cd "$PROJECT_DIR" || exit 1
+    {
+      printf '\n=== Ruby %s: Resetting database ===\n' "$version"
+      mise exec "ruby@$version" -- bundle install &&
+        mise exec "ruby@$version" -- env DISABLE_DATABASE_ENVIRONMENT_CHECK=1 \
+          FORCE=true POSTGRES_STATEMENT_TIMEOUT=150s \
+          bin/rails db:reset
+    } >>"$setup_log" 2>&1
+  )
 }
 
 generate_report() {
@@ -282,17 +328,8 @@ run_one_version() {
   if ((runtime_check_rc == 0)); then
     cd "$PROJECT_DIR" || return 1
 
-    # 1. Clean the database and lock file. -f keeps the run idempotent when
-    # files do not exist.
-    if rm -f ./storage/*.sqlite3 Gemfile.lock; then
-      cleanup_status="PASS"
-      log "Ruby $version: removed storage/*.sqlite3 and Gemfile.lock"
-    else
-      cleanup_status="FAIL"
-      log "Ruby $version: cleanup failed"
-    fi
-
-    # 2. Export every variable loaded from .env, exactly as requested.
+    # 1. Export every variable loaded from .env, exactly as requested. This must
+    # run before the database reset so PostgreSQL production URLs are available.
     set +u
     set -a
     # shellcheck disable=SC1091
@@ -306,6 +343,16 @@ run_one_version() {
     else
       env_status="FAIL (exit $env_rc)"
       log "Ruby $version: source .env failed (exit $env_rc)"
+    fi
+
+    # 2. Reset the database and remove the lock file so each Ruby version
+    # starts from a clean database (PostgreSQL) or fresh SQLite files.
+    if [[ "$env_status" == "PASS" ]] && reset_database "$version" "$setup_log"; then
+      cleanup_status="PASS"
+      log "Ruby $version: reset database and removed Gemfile.lock"
+    else
+      cleanup_status="FAIL"
+      log "Ruby $version: cleanup failed"
     fi
 
     base_url="${API_BASE_URL:-http://127.0.0.1:${PORT:-4000}}"
@@ -427,7 +474,7 @@ run_one_version() {
     echo "| RubyGems | \`$gem_info\` |"
     echo "| Bundler | \`$bundler_info\` |"
     echo "| Rails | \`$rails_info\` |"
-    echo "| Cleanup SQLite/Gemfile.lock | $cleanup_status |"
+    echo "| Reset database/Gemfile.lock | $cleanup_status |"
     echo "| Load .env | $env_status |"
     echo "| Setup/server | $server_status |"
     echo "| Test API | $test_status |"
