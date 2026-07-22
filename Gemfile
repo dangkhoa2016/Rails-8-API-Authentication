@@ -1,6 +1,7 @@
 source "https://rubygems.org"
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
+gem "pagy"
 gem "rails", "~> 8.0.1"
 # Use sqlite3 as the database for Active Record
 gem "sqlite3", ">= 2.1"
@@ -38,7 +39,7 @@ gem "thruster", require: false
 # gem "image_processing", "~> 1.2"
 
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
-# gem "rack-cors"
+gem "rack-cors"
 
 # Required for Ruby 4.0+ as cgi was removed from default gems
 gem "cgi"
@@ -61,6 +62,9 @@ group :development, :test do
 
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
+
+  # Load environment variables from .env files
+  gem "dotenv"
 end
 
 
@@ -68,3 +72,6 @@ gem "devise", "~> 5.0"
 gem "json", ">= 2.19.9"
 
 gem "devise-jwt", "~> 0.13.0"
+
+# Rate limiting for auth endpoints
+gem "rack-attack"
