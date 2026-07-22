@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches: [ main ]
@@ -16,11 +17,33 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: .ruby-version
+          ruby-version: '3.3'
           bundler-cache: true
 
       - name: Scan for common Rails security vulnerabilities using static analysis
         run: bin/brakeman --no-pager
+
+  audit_gems:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Install bundler-audit
+        run: gem install bundler-audit
+
+      - name: Update advisory database
+        run: bundle-audit update
+
+      - name: Check gems for known CVEs
+        run: bundle-audit check
 
   lint:
     runs-on: ubuntu-latest
@@ -31,7 +54,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: .ruby-version
+          ruby-version: '3.3'
           bundler-cache: true
 
       - name: Lint code for consistent style
@@ -39,6 +62,10 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby-version: ['3.2', '3.3', '4.0']
 
     # services:
     #  redis:
@@ -53,10 +80,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up Ruby
+      - name: Set up Ruby ${{ matrix.ruby-version }}
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: .ruby-version
+          ruby-version: ${{ matrix.ruby-version }}
           bundler-cache: true
 
       - name: Set RAILS_MASTER_KEY from GitHub Secrets
@@ -66,4 +93,26 @@ jobs:
         env:
           RAILS_ENV: test
           # REDIS_URL: redis://localhost:6379/0
-        run: bin/rails db:test:prepare test
+          COVERAGE: "1"
+        run: bin/rails db:test:prepare && bin/rails test
+
+      - name: Generate coverage badge
+        if: always()
+        run: |
+          if [ -f public/coverage/.last_run.json ]; then
+            ruby -rjson -e '
+              data = JSON.parse(File.read("public/coverage/.last_run.json"))
+              coverage = data.dig("result", "line") || 0
+              color = coverage >= 80 ? "brightgreen" : coverage >= 50 ? "yellow" : "red"
+              badge = { schemaVersion: 1, label: "coverage", message: "#{coverage.round(1)}%", color: color }
+              File.write("public/coverage/coverage-badge.json", JSON.generate(badge))
+            '
+          fi
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report-ruby-${{ matrix.ruby-version }}
+          path: public/coverage/
+          retention-days: 14
