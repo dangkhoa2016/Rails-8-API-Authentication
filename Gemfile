@@ -1,7 +1,6 @@
 source "https://rubygems.org"
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
-gem "pagy"
 gem "rails", "~> 8.1.3"
 # Use sqlite3 as the database for Active Record
 gem "sqlite3", ">= 2.1"
@@ -79,3 +78,4 @@ gem "devise-jwt", "~> 0.13.0"
 
 # Rate limiting for auth endpoints
 gem "rack-attack"
+gem "pagy"

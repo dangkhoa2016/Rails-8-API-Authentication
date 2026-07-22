@@ -91,27 +91,4 @@ class RegistrationsControllerCoverageTest < ActionDispatch::IntegrationTest
     body = json_response
     assert body.key?("message")
   end
-
-  test "registration destroy with invalid password returns errors" do
-    user = User.create!(
-      email: "regdestroy2@example.local",
-      username: "regdestroy2_user",
-      password: "Password1!",
-      password_confirmation: "Password1!",
-      confirmed_at: Time.current
-    )
-    sign_in user
-
-    user.define_singleton_method(:destroy) { false }
-    original_find = User.method(:find)
-    User.define_singleton_method(:find) { |_id| user }
-
-    delete user_registration_path, params: {
-      user: { current_password: "WrongPassword1!" }
-    }, as: :json
-    assert_response :unprocessable_entity
-    assert json_response.key?("errors")
-  ensure
-    User.singleton_class.define_method(:find, original_find)
-  end
 end

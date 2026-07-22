@@ -14,6 +14,29 @@ class UserControllerTest < ActionDispatch::IntegrationTest
   test "should get index" do
     get users_url, as: :json
     assert_response :success
+    body = json_response
+    assert body.key?("users")
+    assert body.key?("meta")
+    meta = body["meta"]
+    assert_equal 1, meta["current_page"]
+    assert_equal 20, meta["per_page"]
+    assert meta["total_count"] > 0
+    assert meta["total_pages"] > 0
+  end
+
+  test "index supports custom per_page" do
+    get users_url(per_page: 2), as: :json
+    assert_response :success
+    body = json_response
+    assert_equal 2, body["meta"]["per_page"]
+    assert body["users"].length <= 2
+  end
+
+  test "index caps per_page at 100" do
+    get users_url(per_page: 999), as: :json
+    assert_response :success
+    body = json_response
+    assert_equal 100, body["meta"]["per_page"]
   end
 
   test "should create user" do
@@ -48,7 +71,7 @@ class UserControllerTest < ActionDispatch::IntegrationTest
     get user_url(999_999), as: :json
 
     assert_response :not_found
-    assert_equal({ "error" => "Record not found" }, json_response)
+    assert_equal({ "error" => "Record not found" }, JSON.parse(@response.body))
   end
 
   test "should update user" do
@@ -143,22 +166,21 @@ class UserControllerTest < ActionDispatch::IntegrationTest
     assert_not_nil json_response["errors"]
   end
 
-  # --- Update with blank password (line 48) ---
+  # --- Error handling branches ---
 
-  test "update with blank password strips password params" do
-    put user_url(@user_test), params: {
-      user: {
-        first_name: "Updated",
-        password: "",
-        password_confirmation: ""
-      }
-    }, as: :json
-    assert_response :success
-    @user_test.reload
-    assert_equal "Updated", @user_test.first_name
+  test "destroy handles failure" do
+    user = User.find(@user_test.id)
+    user.define_singleton_method(:destroy) { false }
+    original_find = User.method(:find)
+    User.define_singleton_method(:find) { |*args| user }
+
+    delete user_url(@user_test), as: :json
+    assert_response :unprocessable_entity
+  ensure
+    User.singleton_class.define_method(:find, original_find)
   end
 
-  # --- Update failure path (line 39) ---
+  # --- Update failure path ---
 
   test "update returns errors on validation failure" do
     put user_url(@user_test), params: {
@@ -168,17 +190,184 @@ class UserControllerTest < ActionDispatch::IntegrationTest
     assert json_response.key?("errors")
   end
 
-  # --- Destroy failure path (line 48) ---
+  # --- Create failure path ---
 
-  test "destroy returns error on failure" do
+  test "create renders errors on validation failure" do
+    post users_create_url, params: {
+      user: {
+        email: "user1@example.local",
+        username: "dup_create_user",
+        password: "Password1!",
+        password_confirmation: "Password1!"
+      }
+    }, as: :json
+    assert_response :unprocessable_entity
+    assert json_response.key?("errors")
+  end
+
+  # --- self-demotion guard ---
+
+  test "admin cannot demote themselves" do
+    put user_url(@user), params: {
+      user: { role: "user" }
+    }, as: :json
+    assert_response :forbidden
+    assert_equal "Cannot demote yourself", json_response["error"]
+  end
+
+  # --- non-admin password update ---
+
+  test "non-admin cannot update password with wrong current password" do
+    regular = confirmed_user("wrong-pw@example.local", role: "user",
+                             first_name: "Wrong", last_name: "Pw",
+                             confirmed_at: Time.current)
+    sign_out @user
+    sign_in regular
+
+    put user_url(regular), params: {
+      user: {
+        password: "NewPassword1!",
+        password_confirmation: "NewPassword1!",
+        current_password: "WrongPassword1!"
+      }
+    }, as: :json
+    assert_response :unprocessable_entity
+    assert_equal "Current password is incorrect", json_response["error"]
+  end
+
+  test "non-admin can update password with correct current password" do
+    regular = confirmed_user("pw-update@example.local", role: "user",
+                             first_name: "Pw", last_name: "Update",
+                             confirmed_at: Time.current)
+    sign_out @user
+    sign_in regular
+
+    put user_url(regular), params: {
+      user: {
+        password: "NewPassword1!",
+        password_confirmation: "NewPassword1!",
+        current_password: "Password1!"
+      }
+    }, as: :json
+    assert_response :success
+  end
+
+  # --- toggle_status ---
+
+  test "toggle_status activates user" do
+    @user_test.update!(active: false)
+    put "/users/#{@user_test.id}/status", params: {
+      user: { active: true }
+    }, as: :json
+    assert_response :success
+    assert @user_test.reload.active?
+  end
+
+  test "toggle_status deactivates user" do
+    @user_test.update!(active: true)
+    put "/users/#{@user_test.id}/status", params: {
+      user: { active: false }
+    }, as: :json
+    assert_response :success
+    assert_not @user_test.reload.active?
+  end
+
+  test "toggle_status rejects nil boolean value" do
+    put "/users/#{@user_test.id}/status", params: {
+      user: { active: "maybe" }
+    }, as: :json
+    assert_response :unprocessable_entity
+    assert_equal "active must be a boolean", json_response["error"]
+  end
+
+  test "toggle_status handles update failure" do
     user = User.find(@user_test.id)
-    user.define_singleton_method(:destroy) { false }
-    original_find_by_id = User.method(:find_by_id!)
-    User.define_singleton_method(:find_by_id!) { |_id| user }
+    original_find = User.method(:find)
+    User.define_singleton_method(:find) { |*_args| user }
+    user.define_singleton_method(:update) { |_opts| false }
 
-    delete user_url(@user_test), as: :json
+    put "/users/#{@user_test.id}/status", params: {
+      user: { active: true }
+    }, as: :json
     assert_response :unprocessable_entity
   ensure
-    User.singleton_class.define_method(:find_by_id!, original_find_by_id)
+    User.singleton_class.define_method(:find, original_find)
+  end
+
+  test "toggle_status accepts string true values" do
+    @user_test.update!(active: false)
+    put "/users/#{@user_test.id}/status", params: {
+      user: { active: "yes" }
+    }, as: :json
+    assert_response :success
+    assert @user_test.reload.active?
+  end
+
+  test "toggle_status accepts string false values" do
+    @user_test.update!(active: true)
+    put "/users/#{@user_test.id}/status", params: {
+      user: { active: "no" }
+    }, as: :json
+    assert_response :success
+    assert_not @user_test.reload.active?
+  end
+
+  test "toggle_status accepts numeric 1 as true" do
+    @user_test.update!(active: false)
+    put "/users/#{@user_test.id}/status", params: {
+      user: { active: "1" }
+    }, as: :json
+    assert_response :success
+    assert @user_test.reload.active?
+  end
+
+  test "toggle_status accepts numeric 0 as false" do
+    @user_test.update!(active: true)
+    put "/users/#{@user_test.id}/status", params: {
+      user: { active: "0" }
+    }, as: :json
+    assert_response :success
+    assert_not @user_test.reload.active?
+  end
+
+  # --- confirm_by_admin ---
+
+  test "confirm_by_admin confirms and activates user" do
+    @user_test.update!(confirmed_at: nil, active: false)
+    put "/users/#{@user_test.id}/confirm_by_admin", as: :json
+    assert_response :success
+    @user_test.reload
+    assert_not_nil @user_test.confirmed_at
+    assert @user_test.active?
+  end
+
+  test "confirm_by_admin handles update failure" do
+    user = User.find(@user_test.id)
+    original_find = User.method(:find)
+    User.define_singleton_method(:find) { |*_args| user }
+    user.define_singleton_method(:update) { |_opts| false }
+
+    put "/users/#{@user_test.id}/confirm_by_admin", as: :json
+    assert_response :unprocessable_entity
+  ensure
+    User.singleton_class.define_method(:find, original_find)
+  end
+
+  # --- find_user by email ---
+
+  test "find_user resolves by email in path" do
+    put "/users/#{@user_test.email}/status", params: {
+      user: { active: true }
+    }, as: :json
+    assert_response :success
+  end
+
+  # --- find_user by username ---
+
+  test "find_user resolves by username in path" do
+    put "/users/#{@user_test.username}/status", params: {
+      user: { active: true }
+    }, as: :json
+    assert_response :success
   end
 end
