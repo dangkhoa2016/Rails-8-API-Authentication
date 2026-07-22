@@ -22,8 +22,21 @@ class User < ApplicationRecord
                        length: { in: 3..25, allow_blank: true },
                        format: { with: /\A[a-zA-Z0-9_-]+\z/, allow_blank: true }
 
+  def self.find_for_database_authentication(conditions)
+    value = conditions[:email].to_s.downcase
+    find_by(email: value) || find_by(username: value)
+  end
+
   attr_accessor :token_info
   enum :role, { user: "user", admin: "admin" }
+
+  def active_for_authentication?
+    super && active?
+  end
+
+  def inactive_message
+    active? ? super : :account_inactive
+  end
 
   def on_jwt_dispatch(token, payload)
     # puts "on_jwt_dispatch: #{token}, #{payload}"
@@ -43,7 +56,6 @@ class User < ApplicationRecord
     super
   rescue Net::SMTPError, Net::OpenTimeout, Net::ReadTimeout => e
     Rails.logger.error "Failed to send confirmation instructions to #{email}: #{e.class} - #{e.message}"
-    raise
   end
 
   SENSITIVE_FIELDS = %w[

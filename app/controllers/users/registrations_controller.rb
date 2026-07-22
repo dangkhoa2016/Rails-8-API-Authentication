@@ -16,7 +16,7 @@ class Users::RegistrationsController < Devise::RegistrationsController
         return render json: {
           message: find_message(:signed_up_but_unconfirmed, default: "A message with a confirmation link has been sent to your email address. Please follow the link to activate your account."),
           user: resource
-        }, status: :ok
+        }, status: :created
       else
         return render json: { errors: resource.errors.full_messages }, status: :unprocessable_entity
       end

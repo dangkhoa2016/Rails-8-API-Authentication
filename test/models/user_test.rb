@@ -25,19 +25,19 @@ class UserTest < ActiveSupport::TestCase
   # --- Email format validation ---
 
   test "should not save user with invalid email format" do
-    user = User.new(email: "not-an-email", password: "password", password_confirmation: "password")
+    user = User.new(email: "not-an-email", username: "invalid_email_user", password: "Password1!", password_confirmation: "Password1!")
     assert_not user.save, "Saved user with invalid email"
   end
 
   test "should not save user with duplicate email" do
-    user = User.new(email: "user1@example.local", password: "password", password_confirmation: "password")
+    user = User.new(email: "user1@example.local", username: "duplicate_email_user", password: "Password1!", password_confirmation: "Password1!")
     assert_not user.save, "Saved user with duplicate email"
   end
 
   # --- Role enum ---
 
   test "default role is user" do
-    user = User.new(email: "role@example.local", password: "password", password_confirmation: "password")
+    user = User.new(email: "role@example.local", username: "role_user", password: "Password1!", password_confirmation: "Password1!")
     assert_equal "user", user.role
   end
 
@@ -82,29 +82,125 @@ class UserTest < ActiveSupport::TestCase
     user = User.new(
       email: "unique@example.local",
       username: "user1",  # already taken by fixture :one
-      password: "password",
-      password_confirmation: "password"
+      password: "Password1!",
+      password_confirmation: "Password1!"
     )
     assert_not user.save, "Saved user with duplicate username"
     assert_includes user.errors[:username], "has already been taken"
   end
 
-  # --- send_confirmation_instructions error handling ---
-
-  test "send_confirmation_instructions logs and re-raises SMTP errors" do
-    user = User.create!(
-      email: "smtperror@example.local",
-      username: "smtperror_user",
+  test "blank username is normalized to nil" do
+    user = User.new(
+      email: "blank-username@example.local",
+      username: "   ",
       password: "Password1!",
       password_confirmation: "Password1!"
     )
+
+    assert user.save
+    assert_nil user.reload.username
+  end
+
+  test "serializable hash includes unconfirmed email when present" do
+    user = User.new(
+      email: "reconfirm@example.local",
+      username: "reconfirm_user",
+      password: "Password1!",
+      password_confirmation: "Password1!",
+      unconfirmed_email: "pending@example.local"
+    )
+
+    assert_equal "pending@example.local", user.serializable_hash[:unconfirmed_email]
+  end
+
+  # --- find_for_database_authentication ---
+
+  test "finds user by email" do
+    user = User.find_for_database_authentication(email: "user1@example.local")
+    assert_equal users(:one), user
+  end
+
+  test "finds user by username" do
+    user = User.find_for_database_authentication(email: "user1")
+    assert_equal users(:one), user
+  end
+
+  test "finds user by username when no email matches" do
+    user = User.find_for_database_authentication(email: "admin_user")
+    assert_equal users(:admin), user
+  end
+
+  test "returns nil for nonexistent email or username" do
+    assert_nil User.find_for_database_authentication(email: "nonexistent@example.com")
+    assert_nil User.find_for_database_authentication(email: "completely_unknown")
+  end
+
+  test "returns nil for blank login" do
+    assert_nil User.find_for_database_authentication(email: "")
+    assert_nil User.find_for_database_authentication(email: nil)
+  end
+
+  # --- active_for_authentication? ---
+
+  test "active user is active for authentication" do
+    assert users(:admin).active_for_authentication?
+  end
+
+  test "inactive user is not active for authentication" do
+    user = users(:admin)
+    user.update!(active: false)
+    assert_not user.active_for_authentication?
+  end
+
+  test "inactive message for active user delegates to super" do
+    assert_equal :inactive, users(:admin).inactive_message
+  end
+
+  test "inactive message for deactivated user" do
+    user = users(:admin)
+    user.update!(active: false)
+    assert_equal :account_inactive, user.inactive_message
+  end
+
+  test "active defaults to true for new users" do
+    user = User.new(
+      email: "active-default@example.local",
+      username: "active_default_user",
+      password: "Password1!",
+      password_confirmation: "Password1!"
+    )
+    assert user.active?
+  end
+
+  test "send confirmation instructions logs and swallows delivery errors" do
+    user = User.create!(
+      email: "delivery-error@example.local",
+      username: "delivery_error_user",
+      password: "Password1!",
+      password_confirmation: "Password1!"
+    )
+
+    logger = Class.new {
+      attr_reader :messages
+
+      def initialize
+        @messages = []
+      end
+
+      def error(message)
+        @messages << message
+        nil
+      end
+    }.new
 
     user.define_singleton_method(:send_devise_notification) do |*_args|
       raise Net::SMTPFatalError, "mailer exploded"
     end
 
-    assert_raises(Net::SMTPFatalError) do
-      user.send_confirmation_instructions
+    Rails.stub(:logger, logger) do
+      assert_nil user.send_confirmation_instructions
     end
+
+    assert_includes logger.messages, "Failed to send confirmation instructions to delivery-error@example.local: Net::SMTPFatalError - mailer exploded"
   end
 end

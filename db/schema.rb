@@ -23,7 +23,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_18_000000) do
   create_table "users", force: :cascade do |t|
     t.string "email", default: "", null: false
     t.string "encrypted_password", default: "", null: false
-    t.string "username", default: ""
+    t.string "username"
     t.string "first_name", default: "", null: false
     t.string "last_name", default: "", null: false
     t.string "avatar"
@@ -45,6 +45,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_18_000000) do
     t.datetime "locked_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "active", default: true, null: false
     t.index ["confirmation_token"], name: "index_users_on_confirmation_token", unique: true
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
