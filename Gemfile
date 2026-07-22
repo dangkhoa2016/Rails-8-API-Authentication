@@ -65,11 +65,15 @@ group :development, :test do
 
   # Load environment variables from .env files
   gem "dotenv"
+
+  # Code coverage
+  gem "simplecov", require: false
+  gem "simplecov-console", require: false
+  gem "json", ">= 2.19.9", require: false if RUBY_VERSION.start_with?("3.2")
 end
 
 
 gem "devise", "~> 5.0"
-gem "json", ">= 2.19.9"
 
 gem "devise-jwt", "~> 0.13.0"
 

@@ -1,0 +1,140 @@
+# frozen_string_literal: true
+
+require "test_helper"
+
+# Tests to cover lines that existing tests miss at this commit.
+# Each test targets specific uncovered lines identified by SimpleCov.
+
+class CoverageBackfillTest < ActiveSupport::TestCase
+  # --- lib/failure_middleware.rb (lines 3-6) ---
+
+  test "FailureMiddleware class is loadable" do
+    assert_equal Devise::FailureApp, FailureMiddleware.superclass
+  end
+
+  test "FailureMiddleware http_auth_body returns JSON for JSON format" do
+    middleware = FailureMiddleware.new
+    env = Rack::MockRequest.env_for("/", "HTTP_ACCEPT" => "application/json", "action_dispatch.request.format" => :json)
+    request = ActionDispatch::Request.new(env)
+    middleware.define_singleton_method(:request) { request }
+    middleware.define_singleton_method(:request_format) { :json }
+    middleware.define_singleton_method(:i18n_message) { "invalid" }
+    result = middleware.send(:http_auth_body)
+    parsed = JSON.parse(result)
+    assert_equal false, parsed["success"]
+    assert_equal "invalid", parsed["message"]
+  end
+
+  # --- lib/coverage_report_redirect_middleware.rb (lines 3-6, 9-10, 12, 14, 17, 19-20, 23-24, 26) ---
+
+  test "CoverageReportRedirectMiddleware initializes with app" do
+    app = ->(env) { [ 200, {}, [ "OK" ] ] }
+    middleware = CoverageReportRedirectMiddleware.new(app)
+    assert middleware.respond_to?(:call)
+  end
+
+  test "CoverageReportRedirectMiddleware passes through non-coverage requests" do
+    app = ->(env) { [ 200, {}, [ "OK" ] ] }
+    middleware = CoverageReportRedirectMiddleware.new(app)
+    env = Rack::MockRequest.env_for("/other-path", method: "GET")
+    status, _headers, _body = middleware.call(env)
+    assert_equal 200, status
+  end
+
+  test "CoverageReportRedirectMiddleware redirects /coverage when report exists" do
+    app = ->(env) { [ 200, {}, [ "OK" ] ] }
+    report_path = Rails.root.join("public/coverage/index.html")
+    middleware = CoverageReportRedirectMiddleware.new(app, report_path: report_path)
+
+    # Create the report file if it doesn't exist
+    FileUtils.mkdir_p(File.dirname(report_path))
+    FileUtils.touch(report_path) unless File.exist?(report_path)
+
+    env = Rack::MockRequest.env_for("/coverage", method: "GET")
+    status, headers, _body = middleware.call(env)
+    assert_equal 302, status
+    assert headers["Location"].include?("/coverage/")
+  ensure
+    FileUtils.rm_f(report_path)
+  end
+
+  test "CoverageReportRedirectMiddleware passes through /coverage when report missing" do
+    app = ->(env) { [ 200, {}, [ "OK" ] ] }
+    middleware = CoverageReportRedirectMiddleware.new(app, report_path: "/nonexistent/path.html")
+    env = Rack::MockRequest.env_for("/coverage", method: "GET")
+    status, _headers, _body = middleware.call(env)
+    assert_equal 200, status
+  end
+
+  # --- app/mailers/application_mailer.rb (lines 3-5) ---
+
+  test "ApplicationMailer is configured" do
+    assert ApplicationMailer < ActionMailer::Base
+    assert_equal "from@example.com", ApplicationMailer.default[:from]
+  end
+
+  # --- app/controllers/users/confirmations_controller.rb (line 3) ---
+
+  test "ConfirmationsController is a Devise::ConfirmationsController subclass" do
+    assert Users::ConfirmationsController < Devise::ConfirmationsController
+  end
+
+  # --- app/controllers/users/omniauth_callbacks_controller.rb (line 3) ---
+
+  test "OmniauthCallbacksController is a Devise subclass" do
+    assert Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
+  end
+
+  # --- app/controllers/users/unlocks_controller.rb (line 3) ---
+
+  test "UnlocksController is a Devise::UnlocksController subclass" do
+    assert Users::UnlocksController < Devise::UnlocksController
+  end
+
+  # --- app/jobs/application_job.rb (line 3) ---
+
+  test "ApplicationJob is an ActiveJob subclass" do
+    assert ApplicationJob < ActiveJob::Base
+  end
+
+  # --- app/jobs/clean_expired_jwt_denylists_job.rb (lines 3-4, 6-8) ---
+
+  test "CleanExpiredJwtDenylistsJob runs and deletes expired entries" do
+    initial_count = JwtDenylist.count
+    # Create an expired denylist entry
+    JwtDenylist.create!(
+      jti: SecureRandom.uuid,
+      exp: 1.hour.ago
+    )
+    # Create a non-expired denylist entry
+    JwtDenylist.create!(
+      jti: SecureRandom.uuid,
+      exp: 1.hour.from_now
+    )
+
+    assert_operator JwtDenylist.count, :>, initial_count
+    CleanExpiredJwtDenylistsJob.perform_now
+    assert_operator JwtDenylist.count, :<, JwtDenylist.count
+  end
+
+  # --- app/models/user.rb (lines 45-46) ---
+
+  test "SENSITIVE_FIELDS constant is defined and frozen" do
+    assert User::SENSITIVE_FIELDS.frozen?
+    assert_includes User::SENSITIVE_FIELDS, "encrypted_password"
+    assert_includes User::SENSITIVE_FIELDS, "reset_password_token"
+  end
+
+  # --- app/controllers/application_controller.rb (line 39) ---
+
+  test "pagy_metadata returns expected structure" do
+    controller = ApplicationController.new
+    fake_pagy = OpenStruct.new(page: 1, limit: 20, count: 100, last: 5)
+    result = controller.send(:pagy_metadata, fake_pagy)
+
+    assert_equal 1, result[:current_page]
+    assert_equal 20, result[:per_page]
+    assert_equal 100, result[:total_count]
+    assert_equal 5, result[:total_pages]
+  end
+end

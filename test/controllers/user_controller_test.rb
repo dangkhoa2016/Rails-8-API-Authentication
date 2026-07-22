@@ -73,4 +73,93 @@ class UserControllerTest < ActionDispatch::IntegrationTest
       delete user_url(@user), as: :json
     end
   end
+
+  # --- Non-admin access rejection ---
+
+  test "non-admin cannot access users index" do
+    sign_out @user
+    regular = confirmed_user("regular@example.local", role: "user",
+                             first_name: "Regular", last_name: "User",
+                             confirmed_at: Time.current)
+    sign_in regular
+
+    get users_url, as: :json
+    assert_response :forbidden
+  end
+
+  test "non-admin cannot destroy another user" do
+    sign_out @user
+    regular = confirmed_user("regular2@example.local", role: "user",
+                             first_name: "Regular", last_name: "User",
+                             confirmed_at: Time.current)
+    sign_in regular
+
+    delete user_url(@user_test), as: :json
+    assert_response :forbidden
+  end
+
+  # --- Duplicate email registration ---
+
+  test "cannot create user with duplicate email" do
+    post users_create_url, params: {
+      user: { email: "user1@example.local", username: "dup_user", password: "Password1!",
+      password_confirmation: "Password1!" }
+    }, as: :json
+    assert_response :unprocessable_entity
+    assert_not_nil json_response["errors"]
+  end
+
+  # --- Password confirmation mismatch ---
+
+  test "cannot create user when password confirmation does not match" do
+    post users_create_url, params: {
+      user: {
+        email: "mismatch@example.local",
+        username: "mismatch_user",
+        password: "Password1!",
+        password_confirmation: "different"
+      }
+    }, as: :json
+    assert_response :unprocessable_entity
+    assert_not_nil json_response["errors"]
+  end
+
+  # --- Update with blank password (line 48) ---
+
+  test "update with blank password strips password params" do
+    put user_url(@user_test), params: {
+      user: {
+        first_name: "Updated",
+        password: "",
+        password_confirmation: ""
+      }
+    }, as: :json
+    assert_response :success
+    @user_test.reload
+    assert_equal "Updated", @user_test.first_name
+  end
+
+  # --- Update failure path (line 39) ---
+
+  test "update returns errors on validation failure" do
+    put user_url(@user_test), params: {
+      user: { username: @user.username }
+    }, as: :json
+    assert_response :unprocessable_entity
+    assert json_response.key?("errors")
+  end
+
+  # --- Destroy failure path (line 48) ---
+
+  test "destroy returns error on failure" do
+    user = User.find(@user_test.id)
+    user.define_singleton_method(:destroy) { false }
+    original_find_by_id = User.method(:find_by_id!)
+    User.define_singleton_method(:find_by_id!) { |_id| user }
+
+    delete user_url(@user_test), as: :json
+    assert_response :unprocessable_entity
+  ensure
+    User.singleton_class.define_method(:find_by_id!, original_find_by_id)
+  end
 end
