@@ -3,6 +3,7 @@
 [![Ruby 3.x](https://img.shields.io/badge/Ruby-3.x-red?style=flat&logo=ruby&logoColor=white)](https://www.ruby-lang.org/)
 [![Ruby 4.x](https://img.shields.io/badge/Ruby-4.x-red?style=flat&logo=ruby&logoColor=white)](https://www.ruby-lang.org/)
 [![Rails 8.1.3](https://img.shields.io/badge/Rails-8.1.3-CC0000?logo=rubyonrails&logoColor=white)](https://rubyonrails.org/)
+[![CI](https://github.com/dangkhoa2016/Rails-8-API-Authentication/actions/workflows/ci.yml/badge.svg)](https://github.com/dangkhoa2016/Rails-8-API-Authentication/actions/workflows/ci.yml)
 [![CircleCI](https://dl.circleci.com/status-badge/img/gh/dangkhoa2016/Rails-8-API-Authentication/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/dangkhoa2016/Rails-8-API-Authentication/tree/main)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -320,6 +321,12 @@ Project improvement artifacts are tracked in:
 
 - [manual/PROJECT_IMPROVEMENT_REPORT.md](./manual/PROJECT_IMPROVEMENT_REPORT.md)
 - [manual/IMPLEMENTATION_TRACKER.md](./manual/IMPLEMENTATION_TRACKER.md)
+
+## Related Projects
+
+This project has a sibling Node.js implementation that covers similar authentication concepts (JWT, role-based access control, token revocation) on a different stack:
+
+- **[dangkhoa2016/Nodejs-API-Authentication](https://github.com/dangkhoa2016/Nodejs-API-Authentication)** — A production-ready REST API for authentication and user management, built with **Hono**, **Sequelize**, **bcryptjs**, **JWT**, **SQLite** (dev), and **Postgres** (prod).
 
 ## License
 

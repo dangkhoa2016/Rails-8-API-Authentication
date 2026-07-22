@@ -2,8 +2,7 @@
 
 require "test_helper"
 
-# Tests to cover lines that existing tests miss at this commit.
-# Each test targets specific uncovered lines identified by SimpleCov.
+require "ostruct"
 
 class CoverageBackfillTest < ActiveSupport::TestCase
   # --- lib/failure_middleware.rb (lines 3-6) ---
@@ -27,7 +26,7 @@ class CoverageBackfillTest < ActiveSupport::TestCase
     end
   end
 
-  # --- lib/coverage_report_redirect_middleware.rb (lines 3-6, 9-10, 12, 14, 17, 19-20, 23-24, 26) ---
+  # --- lib/coverage_report_redirect_middleware.rb ---
 
   test "CoverageReportRedirectMiddleware initializes with app" do
     app = ->(env) { [ 200, {}, [ "OK" ] ] }
@@ -48,7 +47,6 @@ class CoverageBackfillTest < ActiveSupport::TestCase
     report_path = Rails.root.join("public/coverage/index.html")
     middleware = CoverageReportRedirectMiddleware.new(app, report_path: report_path)
 
-    # Create the report file if it doesn't exist
     FileUtils.mkdir_p(File.dirname(report_path))
     FileUtils.touch(report_path) unless File.exist?(report_path)
 
@@ -68,7 +66,7 @@ class CoverageBackfillTest < ActiveSupport::TestCase
     assert_equal 200, status
   end
 
-  # --- app/mailers/application_mailer.rb (lines 3-5) ---
+  # --- app/mailers/application_mailer.rb ---
 
   test "ApplicationMailer is configured" do
     assert ApplicationMailer < ActionMailer::Base
@@ -105,7 +103,7 @@ class CoverageBackfillTest < ActiveSupport::TestCase
     assert ApplicationJob < ActiveJob::Base
   end
 
-  # --- app/jobs/clean_expired_jwt_denylists_job.rb (lines 3-4, 6-8) ---
+  # --- app/jobs/clean_expired_jwt_denylists_job.rb ---
 
   test "CleanExpiredJwtDenylistsJob runs without error" do
     JwtDenylist.create!(jti: SecureRandom.uuid, exp: 1.hour.ago)
@@ -113,7 +111,7 @@ class CoverageBackfillTest < ActiveSupport::TestCase
     assert_nothing_raised { CleanExpiredJwtDenylistsJob.perform_now }
   end
 
-  # --- app/models/user.rb (lines 45-46) ---
+  # --- app/models/user.rb ---
 
   test "SENSITIVE_FIELDS constant is defined and frozen" do
     assert User::SENSITIVE_FIELDS.frozen?
@@ -121,7 +119,7 @@ class CoverageBackfillTest < ActiveSupport::TestCase
     assert_includes User::SENSITIVE_FIELDS, "reset_password_token"
   end
 
-  # --- app/controllers/application_controller.rb (line 39) ---
+  # --- app/controllers/application_controller.rb ---
 
   test "pagy_metadata returns expected structure" do
     controller = ApplicationController.new
