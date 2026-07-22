@@ -49,3 +49,5 @@ end
 
 gem "devise", "~> 5.0"
 gem "json", ">= 2.19.9"
+
+gem "devise-jwt", "~> 0.13.0"
