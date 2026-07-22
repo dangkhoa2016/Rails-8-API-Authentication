@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "net/smtp"
+
 class User < ApplicationRecord
   # Include default devise modules. Others available are:
   # :omniauthable
@@ -32,7 +34,16 @@ class User < ApplicationRecord
   # even if they're added to the model in the future
   def serializable_hash(options = nil)
     opts = (options || {}).merge(except: SENSITIVE_FIELDS)
-    super(opts)
+    result = super(opts)
+    result[:unconfirmed_email] = unconfirmed_email if unconfirmed_email.present?
+    result
+  end
+
+  def send_confirmation_instructions
+    super
+  rescue Net::SMTPError, Net::OpenTimeout, Net::ReadTimeout => e
+    Rails.logger.error "Failed to send confirmation instructions to #{email}: #{e.class} - #{e.message}"
+    raise
   end
 
   SENSITIVE_FIELDS = %w[
