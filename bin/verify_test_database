@@ -1,0 +1,21 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+ENV["RAILS_ENV"] = "test"
+require_relative "../config/environment"
+
+config = ActiveRecord::Base.connection_db_config
+allowed_hosts = %w[127.0.0.1 localhost postgres]
+
+def reject!(message)
+  warn "Database reset rejected: #{message}"
+  exit 1
+end
+
+reject!("ALLOW_DATABASE_RESET must equal 1") unless ENV["ALLOW_DATABASE_RESET"] == "1"
+reject!("Rails environment is not test") unless Rails.env.test?
+reject!("adapter is not PostgreSQL") unless config.adapter == "postgresql"
+reject!("database name does not end in _test") unless config.database.to_s.end_with?("_test")
+reject!("host is not an approved local/CI host") unless allowed_hosts.include?(config.host.to_s)
+
+puts "Database reset approved for PostgreSQL test database #{config.database.inspect}"
