@@ -30,7 +30,7 @@ This project is a Rails 8 API authentication service built with Devise and JWT. 
 - **Devise** — Flexible authentication solution
 - **devise-jwt** — JWT token authentication for Devise
 - **Puma** — Application web server
-- **SQLite** — Database
+- **PostgreSQL 17** — Database
 - **Solid Cache**, **Solid Queue**, **Solid Cable** — Rails 8 default adapters
 - **Rack::CORS** — Cross-Origin Resource Sharing
 - **Rack::Attack** — Rate limiting on auth endpoints
@@ -88,21 +88,33 @@ persisted or logged — only their SHA-256 digest is stored. See
 
 ## Quick Start
 
-1. Install dependencies and prepare the database.
+The application requires **PostgreSQL 17** (local development uses the `pg` adapter).
+
+1. Install and start PostgreSQL 17, then create the local roles and databases. On
+   Debian/Ubuntu, `apt-get install postgresql-17` is one option; Docker works too:
 
 ```bash
+docker run -d --name rails-auth-pg \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres \
+  -p 127.0.0.1:5432:5432 postgres:17
+```
+
+2. Copy the local environment sample and prepare the database.
+
+```bash
+cp .env.example .env
 bin/setup
 ```
 
-2. Start the application.
+3. Start the application.
 
 ```bash
 bin/dev
 ```
 
-3. Call the API on `http://localhost:4000` by default. If you set `PORT` in your shell or `.env`, use that value instead.
+4. Call the API on `http://localhost:4000` by default. If you set `PORT` in your shell or `.env`, use that value instead.
 
-4. Use the snippets in `manual/` as copy/paste references for auth and user-management requests:
+5. Use the snippets in `manual/` as copy/paste references for auth and user-management requests:
 
 - `manual/registration.sh`
 - `manual/session.sh`
@@ -173,10 +185,10 @@ curl -sS -X DELETE http://localhost:4000/users/sign_out \
 
 ## Environment
 
-Copy `.env.sample` to `.env` for local development:
+Copy `.env.example` to `.env` for local development with PostgreSQL:
 
 ```bash
-cp .env.sample .env
+cp .env.example .env
 ```
 
 Recommended local settings for development:
@@ -186,9 +198,21 @@ RAILS_ENV=development
 RAILS_LOG_TO_STDOUT=true
 PORT=4000
 RAILS_MAX_THREADS=3
+POSTGRES_HOST=127.0.0.1
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=rails_8_api_authentication_development
+POSTGRES_TEST_DB=rails_8_api_authentication_test
 ```
 
-If you do not set `PORT`, `bin/dev` boots on `4000` locally. The shipped `.env.sample` sets `PORT=4000`, so copying it unchanged moves local development to `http://localhost:4000`. The full variable reference — including production secrets, Puma concurrency, mailer, admin seed, CORS, and the manual JWT token slot — is documented in `.env.sample`.
+The connection defaults (`POSTGRES_HOST=127.0.0.1`, `POSTGRES_PORT=5432`,
+`POSTGRES_USER=postgres`) match a local PostgreSQL 17 instance or the Docker
+container above; `.env.example` ships values for local development only and must
+never be reused for production. Statement timeouts are controlled with
+`POSTGRES_STATEMENT_TIMEOUT` (default `5000ms`).
+
+If you do not set `PORT`, `bin/dev` boots on `4000` locally. The shipped `.env.example` sets `PORT=4000`, so copying it unchanged moves local development to `http://localhost:4000`. The full variable reference — including production secrets, Puma concurrency, mailer, admin seed, CORS, and the manual JWT token slot — is documented in `.env.sample`.
 
 For browser clients running on a different origin, the default CORS config allows requests from `CORS_ALLOWED_ORIGINS` but does **not** expose the `Authorization` response header. If your frontend needs to read the JWT from the sign-in response, update `config/initializers/cors.rb` to expose that header explicitly.
 
@@ -359,7 +383,7 @@ The `docs/` folder contains deeper implementation and operations notes for the c
 - [docs/ACCESS_CONTROL.md](./docs/ACCESS_CONTROL.md) - Authorization rules for guest, self-service, and admin flows
 - [docs/JWT_LIFECYCLE.md](./docs/JWT_LIFECYCLE.md) - JWT issuance, profile-token metadata, revocation, and cleanup
 - [docs/RATE_LIMITING.md](./docs/RATE_LIMITING.md) - Current Rack::Attack thresholds, error responses, and proxy considerations
-- [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) - Kamal, Docker, environment variables, health checks, and SQLite persistence
+- [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) - Kamal, Docker, environment variables, health checks, and PostgreSQL persistence
 
 ## Improvement Planning
 
