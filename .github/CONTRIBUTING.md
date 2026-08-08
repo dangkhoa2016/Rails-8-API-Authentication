@@ -9,6 +9,7 @@ Thank you for considering contributing to this project. Please follow these guid
 3. Set up the project:
    ```bash
    bundle install
+   cp .env.sample .env
    bin/rails db:prepare
    ```
 4. Create a feature branch: `git checkout -b feat/my-feature`
@@ -18,7 +19,8 @@ Thank you for considering contributing to this project. Please follow these guid
 ### Prerequisites
 
 - Ruby 3.2+ (see `.ruby-version`)
-- SQLite3
+- PostgreSQL 17
+- PostgreSQL client headers (`libpq-dev` on Debian/Ubuntu)
 - `RAILS_MASTER_KEY` environment variable (ask maintainer or use `bin/rails secret` to generate a new key, then `bin/rails credentials:edit`)
 
 ### Running Tests
