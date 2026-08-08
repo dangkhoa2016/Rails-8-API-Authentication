@@ -30,7 +30,7 @@ Dự án này là một dịch vụ xác thực API Rails 8 được xây dựng
 - **Devise** — Giải pháp xác thực linh hoạt
 - **devise-jwt** — Xác thực JWT token cho Devise
 - **Puma** — Web server
-- **SQLite** — Cơ sở dữ liệu
+- **PostgreSQL 17** — Cơ sở dữ liệu
 - **Solid Cache**, **Solid Queue**, **Solid Cable** — Adapters mặc định của Rails 8
 - **Rack::CORS** — Chia sẻ tài nguyên giữa các origin
 - **Rack::Attack** — Giới hạn tốc độ truy cập
@@ -78,29 +78,43 @@ Refresh token được vận chuyển qua hai transport:
 
 - **Browser client** dùng **HttpOnly, Secure, SameSite=Lax cookie** `refresh_token`.
   Không đưa token thô vào `localStorage` hoặc `sessionStorage`.
-- **Native / mobile / CLI client** đọc token thô từ JSON body (`refresh_token`) và
-  gửi lại qua param `refresh_token` hoặc header `X-Refresh-Token`.
+- **Native / mobile / CLI client** đọc token thô từ JSON body
+  (`refresh_token`) và gửi lại qua param `refresh_token` hoặc
+  header `X-Refresh-Token`.
 
-Mọi luồng refresh token phải dùng **TLS trong production**; token thô không bao giờ
-được lưu hoặc log — chỉ SHA-256 digest được lưu. Xem [`docs/JWT_LIFECYCLE.vi.md`](./docs/JWT_LIFECYCLE.vi.md) cho chính sách đầy đủ.
+Mọi luồng refresh token phải dùng **TLS trong production**; token thô không bao
+giờ được lưu hoặc log — chỉ SHA-256 digest được lưu. Xem
+[`docs/JWT_LIFECYCLE.vi.md`](./docs/JWT_LIFECYCLE.vi.md) cho chính sách đầy đủ.
 
 ## Bắt đầu nhanh
 
-1. Cài đặt dependencies và chuẩn bị database.
+Ứng dụng yêu cầu **PostgreSQL 17** (local development dùng adapter `pg`).
+
+1. Cài đặt và khởi động PostgreSQL 17, rồi tạo role và database local. Trên
+   Debian/Ubuntu, `apt-get install postgresql-17` là một lựa chọn; Docker cũng được:
 
 ```bash
+docker run -d --name rails-auth-pg \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres \
+  -p 127.0.0.1:5432:5432 postgres:17
+```
+
+2. Sao chép sample environment local và chuẩn bị database.
+
+```bash
+cp .env.sample .env
 bin/setup
 ```
 
-2. Khởi động ứng dụng.
+3. Khởi động ứng dụng.
 
 ```bash
 bin/dev
 ```
 
-3. Gọi API tại `http://localhost:4000` theo mặc định. Nếu bạn thiết lập `PORT` trong shell hoặc `.env`, hãy sử dụng giá trị đó.
+4. Gọi API tại `http://localhost:4000` theo mặc định. Nếu bạn thiết lập `PORT` trong shell hoặc `.env`, hãy sử dụng giá trị đó.
 
-4. Sử dụng các snippet trong thư mục `manual/` như tài liệu tham khảo copy/paste cho các request xác thực và quản lý người dùng:
+5. Sử dụng các snippet trong thư mục `manual/` như tài liệu tham khảo copy/paste cho các request xác thực và quản lý người dùng:
 
 - `manual/registration.sh`
 - `manual/session.sh`
@@ -171,7 +185,7 @@ curl -sS -X DELETE http://localhost:4000/users/sign_out \
 
 ## Môi trường
 
-Sao chép `.env.sample` thành `.env` cho môi trường local:
+Sao chép `.env.sample` thành `.env` cho môi trường local với PostgreSQL:
 
 ```bash
 cp .env.sample .env
@@ -184,7 +198,19 @@ RAILS_ENV=development
 RAILS_LOG_TO_STDOUT=true
 PORT=4000
 RAILS_MAX_THREADS=3
+POSTGRES_HOST=127.0.0.1
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=rails_8_api_authentication_development
+POSTGRES_TEST_DB=rails_8_api_authentication_test
 ```
+
+Các giá trị mặc định kết nối (`POSTGRES_HOST=127.0.0.1`, `POSTGRES_PORT=5432`,
+`POSTGRES_USER=postgres`) khớp với PostgreSQL 17 local hoặc container Docker ở
+trên; `.env.sample` chỉ chứa giá trị cho local development và không bao giờ
+được dùng lại cho production. Thời gian chờ statement được kiểm soát bằng
+`POSTGRES_STATEMENT_TIMEOUT` (mặc định `5000ms`).
 
 Nếu không thiết lập `PORT`, `bin/dev` sẽ chạy mặc định trên `4000`. File `.env.sample` hiện đặt sẵn `PORT=4000`, nên nếu bạn copy nguyên file này thì local sẽ chạy tại `http://localhost:4000`. Toàn bộ danh sách biến môi trường — bao gồm secret cho production, cấu hình Puma, mailer, admin seed, CORS, và JWT token cho manual scripts — được mô tả trong `.env.sample`.
 
@@ -357,7 +383,7 @@ Thư mục `docs/` chứa các ghi chú chi tiết hơn về implementation và 
 - [docs/ACCESS_CONTROL.vi.md](./docs/ACCESS_CONTROL.vi.md) - Quy tắc phân quyền cho guest, self-service, và admin
 - [docs/JWT_LIFECYCLE.vi.md](./docs/JWT_LIFECYCLE.vi.md) - Vòng đời JWT, metadata ở endpoint profile, thu hồi, và dọn dẹp denylist
 - [docs/RATE_LIMITING.vi.md](./docs/RATE_LIMITING.vi.md) - Các ngưỡng Rack::Attack hiện tại, response khi throttle, và lưu ý sau reverse proxy
-- [docs/DEPLOYMENT.vi.md](./docs/DEPLOYMENT.vi.md) - Triển khai với Kamal, Docker, biến môi trường, health check, và persistence của SQLite
+- [docs/DEPLOYMENT.vi.md](./docs/DEPLOYMENT.vi.md) - Triển khai với Kamal, Docker, biến môi trường, health check, và persistence của PostgreSQL
 
 ## Kế hoạch cải tiến
 

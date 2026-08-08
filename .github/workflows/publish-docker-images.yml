@@ -1,0 +1,61 @@
+name: Publish Docker images
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "docker-*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - variant: postgres
+            ref: postgresql-baseline-v1
+            version: postgres-v1
+            commit_tag: postgres-e7565fd
+            source_commit: e7565fd
+          - variant: sqlite
+            ref: sqlite-baseline-v1
+            version: sqlite-v1
+            commit_tag: sqlite-700edca
+            source_commit: 700edca
+
+    steps:
+      - name: Check out baseline
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ matrix.ref }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/dangkhoa2016/rails-8-api-authentication:${{ matrix.variant }}
+            ghcr.io/dangkhoa2016/rails-8-api-authentication:${{ matrix.version }}
+            ghcr.io/dangkhoa2016/rails-8-api-authentication:${{ matrix.commit_tag }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/dangkhoa2016/rails-8-api-authentication
+            org.opencontainers.image.revision=${{ matrix.source_commit }}

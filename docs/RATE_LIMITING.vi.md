@@ -10,7 +10,7 @@ Rate limiting được xử lý bởi gem **rack-attack 6.8** — một Rack mid
 **Cache backend:**
 - **Test:** `ActiveSupport::Cache::MemoryStore` riêng (không dùng `null_store` của test env vì sẽ không đếm được)
 - **Development:** `:memory_store` (counter sẽ reset khi process app khởi động lại)
-- **Production:** `:solid_cache_store` (SQLite-backed, không cần Redis)
+- **Production:** `:solid_cache_store` dùng database PostgreSQL cache riêng (không cần Redis)
 
 ---
 

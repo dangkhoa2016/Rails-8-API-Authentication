@@ -10,7 +10,7 @@ Rate limiting is handled by the **rack-attack 6.8** gem — a Rack middleware th
 **Cache backend:**
 - **Test:** Dedicated `ActiveSupport::Cache::MemoryStore` (not using `null_store` in test env because it cannot count requests)
 - **Development:** `:memory_store` (counters reset when the app process restarts)
-- **Production:** `:solid_cache_store` (SQLite-backed, no Redis required)
+- **Production:** `:solid_cache_store` backed by the dedicated PostgreSQL cache database (no Redis required)
 
 ---
 
