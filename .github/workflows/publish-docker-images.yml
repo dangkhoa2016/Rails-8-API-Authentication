@@ -1,0 +1,692 @@
+name: Publish Docker images
+
+on:
+  # Manual publishing from the GitHub Actions UI.
+  workflow_dispatch:
+
+  # Keep the existing release trigger.
+  #
+  # IMPORTANT:
+  # docker-* only triggers this workflow.
+  # The actual source code being built still comes from the fixed
+  # baseline refs configured in the matrix below.
+  push:
+    tags:
+      - "docker-*"
+
+permissions:
+  contents: read
+  packages: write
+
+# Publishing should be serialized for the same Git ref.
+#
+# Do NOT cancel a running publication. Cancelling while one matrix job has
+# already pushed its image can leave PostgreSQL and SQLite tags temporarily
+# inconsistent.
+concurrency:
+  group: publish-docker-images-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: dangkhoa2016/rails-8-api-authentication
+  IMAGE_SOURCE: https://github.com/dangkhoa2016/Rails-8-API-Authentication
+  IMAGE_LICENSE: MIT
+
+jobs:
+  publish:
+    name: Build and publish ${{ matrix.variant }}
+
+    runs-on: ubuntu-latest
+
+    # Prevent an unexpected BuildKit/QEMU/network issue from keeping the
+    # publishing job alive indefinitely.
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        include:
+          - variant: postgres
+            ref: postgresql-baseline-v1
+            version: postgres-v1
+            title: Rails 8 API Authentication - PostgreSQL
+            description: Rails 8 API authentication service with Devise, JWT, and PostgreSQL support.
+
+          - variant: sqlite
+            ref: sqlite-baseline-v1
+            version: sqlite-v1
+            title: Rails 8 API Authentication - SQLite
+            description: Rails 8 API authentication service with Devise, JWT, and SQLite support.
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Checkout the exact baseline for this database variant
+      # -----------------------------------------------------------------------
+
+      - name: Check out ${{ matrix.variant }} baseline
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ matrix.ref }}
+          fetch-depth: 1
+
+      # Resolve the actual commit behind the baseline instead of hard-coding
+      # commit IDs into this workflow.
+      - name: Resolve source revision
+        id: source
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          SHA="$(git rev-parse HEAD)"
+          SHORT_SHA="$(git rev-parse --short=7 HEAD)"
+
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+          echo "Baseline: ${{ matrix.ref }}"
+          echo "Commit:   ${SHA}"
+          echo "Short:    ${SHORT_SHA}"
+
+      # -----------------------------------------------------------------------
+      # 2. Multi-platform Buildx environment
+      # -----------------------------------------------------------------------
+
+      # The GitHub-hosted runner is AMD64.
+      # QEMU is therefore needed only for the ARM64 build.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # -----------------------------------------------------------------------
+      # 3. Build and push the canonical multi-platform image
+      # -----------------------------------------------------------------------
+
+      - name: Build and push ${{ matrix.variant }} image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+
+          platforms: |
+            linux/amd64
+            linux/arm64
+
+          push: true
+
+          # Three aliases point to the same canonical multi-platform index:
+          #
+          # postgres:
+          #   postgres
+          #   postgres-v1
+          #   postgres-<source-sha>
+          #
+          # sqlite:
+          #   sqlite
+          #   sqlite-v1
+          #   sqlite-<source-sha>
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.variant }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.variant }}-${{ steps.source.outputs.short_sha }}
+
+          # These labels live in the image configuration of each runnable
+          # platform image.
+          labels: |
+            org.opencontainers.image.title=${{ matrix.title }}
+            org.opencontainers.image.description=${{ matrix.description }}
+            org.opencontainers.image.source=${{ env.IMAGE_SOURCE }}
+            org.opencontainers.image.url=${{ env.IMAGE_SOURCE }}
+            org.opencontainers.image.licenses=${{ env.IMAGE_LICENSE }}
+            org.opencontainers.image.version=${{ matrix.version }}
+            org.opencontainers.image.revision=${{ steps.source.outputs.sha }}
+
+          # Metadata for:
+          #   - the top-level multi-platform OCI index
+          #   - linux/amd64 child manifest
+          #   - linux/arm64 child manifest
+          annotations: |
+            index:org.opencontainers.image.title=${{ matrix.title }}
+            index:org.opencontainers.image.description=${{ matrix.description }}
+            index:org.opencontainers.image.source=${{ env.IMAGE_SOURCE }}
+            index:org.opencontainers.image.url=${{ env.IMAGE_SOURCE }}
+            index:org.opencontainers.image.licenses=${{ env.IMAGE_LICENSE }}
+            index:org.opencontainers.image.version=${{ matrix.version }}
+            index:org.opencontainers.image.revision=${{ steps.source.outputs.sha }}
+
+            manifest[linux/amd64]:org.opencontainers.image.title=${{ matrix.title }} - linux/amd64
+            manifest[linux/amd64]:org.opencontainers.image.description=${{ matrix.description }} Platform: linux/amd64.
+            manifest[linux/amd64]:org.opencontainers.image.source=${{ env.IMAGE_SOURCE }}
+            manifest[linux/amd64]:org.opencontainers.image.url=${{ env.IMAGE_SOURCE }}
+            manifest[linux/amd64]:org.opencontainers.image.licenses=${{ env.IMAGE_LICENSE }}
+            manifest[linux/amd64]:org.opencontainers.image.version=${{ matrix.version }}
+            manifest[linux/amd64]:org.opencontainers.image.revision=${{ steps.source.outputs.sha }}
+
+            manifest[linux/arm64]:org.opencontainers.image.title=${{ matrix.title }} - linux/arm64
+            manifest[linux/arm64]:org.opencontainers.image.description=${{ matrix.description }} Platform: linux/arm64.
+            manifest[linux/arm64]:org.opencontainers.image.source=${{ env.IMAGE_SOURCE }}
+            manifest[linux/arm64]:org.opencontainers.image.url=${{ env.IMAGE_SOURCE }}
+            manifest[linux/arm64]:org.opencontainers.image.licenses=${{ env.IMAGE_LICENSE }}
+            manifest[linux/arm64]:org.opencontainers.image.version=${{ matrix.version }}
+            manifest[linux/arm64]:org.opencontainers.image.revision=${{ steps.source.outputs.sha }}
+
+          # Keep PostgreSQL and SQLite BuildKit caches independent.
+          cache-from: type=gha,scope=rails-auth-${{ matrix.variant }}
+          cache-to: type=gha,mode=max,scope=rails-auth-${{ matrix.variant }}
+
+          # Keep full BuildKit/SLSA provenance.
+          #
+          # GHCR can display provenance/attestation objects as additional
+          # untagged package versions. They are metadata and are not runnable
+          # container images.
+          provenance: mode=max
+
+      # -----------------------------------------------------------------------
+      # 4. Extract the real AMD64 / ARM64 child manifest digests
+      #
+      # IMPORTANT:
+      # Use the immutable Buildx output digest instead of resolving the mutable
+      # :postgres / :sqlite tag again.
+      # -----------------------------------------------------------------------
+
+      - name: Resolve platform manifest digests
+        id: platforms
+        shell: bash
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          INDEX_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -Eeuo pipefail
+
+          INDEX_REF="${IMAGE}@${INDEX_DIGEST}"
+
+          echo "Canonical index:"
+          echo "  ${INDEX_REF}"
+          echo
+
+          inspect_raw_with_retry() {
+            local ref="$1"
+            local output=""
+            local attempt
+
+            for attempt in 1 2 3 4 5 6 7 8 9 10; do
+              if output="$(
+                docker buildx imagetools inspect "${ref}" --raw 2>/tmp/imagetools-inspect.err
+              )"; then
+                printf '%s' "${output}"
+                return 0
+              fi
+
+              echo \
+                "Registry has not exposed ${ref} yet (attempt ${attempt}/10)." \
+                >&2
+
+              sleep 3
+            done
+
+            echo "::error::Unable to inspect ${ref} after 10 attempts." >&2
+
+            if [[ -s /tmp/imagetools-inspect.err ]]; then
+              cat /tmp/imagetools-inspect.err >&2
+            fi
+
+            return 1
+          }
+
+          INDEX_JSON="$(inspect_raw_with_retry "${INDEX_REF}")"
+
+          # Ensure this is actually a manifest list / OCI index.
+          if ! jq -e '
+            (.manifests? // []) | length > 0
+          ' <<< "${INDEX_JSON}" >/dev/null; then
+            echo "::error::Build output is not a multi-platform image index."
+            exit 1
+          fi
+
+          # Require exactly one runnable linux/amd64 manifest.
+          AMD64_DIGEST="$(
+            jq -er '
+              [
+                .manifests[]
+                | select(
+                    .platform.os == "linux"
+                    and .platform.architecture == "amd64"
+                  )
+              ]
+              |
+              if length == 1
+              then .[0].digest
+              else error(
+                "Expected exactly one linux/amd64 runnable manifest"
+              )
+              end
+            ' <<< "${INDEX_JSON}"
+          )"
+
+          # Require exactly one runnable linux/arm64 manifest.
+          ARM64_DIGEST="$(
+            jq -er '
+              [
+                .manifests[]
+                | select(
+                    .platform.os == "linux"
+                    and .platform.architecture == "arm64"
+                  )
+              ]
+              |
+              if length == 1
+              then .[0].digest
+              else error(
+                "Expected exactly one linux/arm64 runnable manifest"
+              )
+              end
+            ' <<< "${INDEX_JSON}"
+          )"
+
+          echo "Resolved platform manifests:"
+          echo "  linux/amd64 = ${AMD64_DIGEST}"
+          echo "  linux/arm64 = ${ARM64_DIGEST}"
+
+          echo "amd64_digest=${AMD64_DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "arm64_digest=${ARM64_DIGEST}" >> "$GITHUB_OUTPUT"
+
+      # -----------------------------------------------------------------------
+      # 5. Create platform-specific aliases
+      #
+      # IMPORTANT CHANGE:
+      #
+      # Do NOT use:
+      #
+      #   --prefer-index=false
+      #
+      # With Buildx's default behavior, a single child manifest is wrapped in
+      # a one-platform image index. This gives GHCR a distinct top-level object
+      # to attach the architecture tag to.
+      #
+      # Expected structure:
+      #
+      # postgres-amd64
+      #   └── linux/amd64
+      #
+      # postgres-arm64
+      #   └── linux/arm64
+      #
+      # sqlite-amd64
+      #   └── linux/amd64
+      #
+      # sqlite-arm64
+      #   └── linux/arm64
+      # -----------------------------------------------------------------------
+
+      - name: Create platform-specific image aliases
+        shell: bash
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          VARIANT: ${{ matrix.variant }}
+          TITLE: ${{ matrix.title }}
+          DESCRIPTION: ${{ matrix.description }}
+          VERSION: ${{ matrix.version }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+          IMAGE_SOURCE: ${{ env.IMAGE_SOURCE }}
+          IMAGE_LICENSE: ${{ env.IMAGE_LICENSE }}
+
+          AMD64_DIGEST: ${{ steps.platforms.outputs.amd64_digest }}
+          ARM64_DIGEST: ${{ steps.platforms.outputs.arm64_digest }}
+        run: |
+          set -Eeuo pipefail
+
+          create_alias() {
+            local arch="$1"
+            local digest="$2"
+
+            local target="${IMAGE}:${VARIANT}-${arch}"
+            local source="${IMAGE}@${digest}"
+            local platform_title="${TITLE} - linux/${arch}"
+            local platform_description="${DESCRIPTION} Platform: linux/${arch}."
+
+            echo
+            echo "Creating platform alias:"
+            echo "  source:      ${source}"
+            echo "  target:      ${target}"
+            echo "  title:       ${platform_title}"
+            echo "  description: ${platform_description}"
+            echo
+
+            # Intentionally DO NOT pass --prefer-index=false.
+            #
+            # The default Buildx behavior wraps this single-platform manifest
+            # in a one-platform OCI image index. Because the tag is attached to
+            # this wrapper index (not directly to the child image manifest), the
+            # wrapper must carry its own OCI annotations. Otherwise GHCR shows
+            # the tag but leaves the package description/title blank even though
+            # the runnable child manifest has image-config labels.
+            docker buildx imagetools create \
+              --annotation "index:org.opencontainers.image.title=${platform_title}" \
+              --annotation "index:org.opencontainers.image.description=${platform_description}" \
+              --annotation "index:org.opencontainers.image.source=${IMAGE_SOURCE}" \
+              --annotation "index:org.opencontainers.image.url=${IMAGE_SOURCE}" \
+              --annotation "index:org.opencontainers.image.licenses=${IMAGE_LICENSE}" \
+              --annotation "index:org.opencontainers.image.version=${VERSION}" \
+              --annotation "index:org.opencontainers.image.revision=${SOURCE_SHA}" \
+              --tag "${target}" \
+              "${source}"
+          }
+
+          create_alias "amd64" "${AMD64_DIGEST}"
+          create_alias "arm64" "${ARM64_DIGEST}"
+
+      # -----------------------------------------------------------------------
+      # 6. Strict verification
+      #
+      # This is intentionally stronger than merely running:
+      #
+      #   docker buildx imagetools inspect IMAGE
+      #
+      # We verify:
+      #
+      #   - all canonical tags resolve
+      #   - canonical indexes contain the exact AMD64 child digest
+      #   - canonical indexes contain the exact ARM64 child digest
+      #   - *-amd64 is an index
+      #   - *-amd64 contains exactly one runnable linux/amd64 manifest
+      #   - *-amd64 points to the exact original AMD64 child digest
+      #   - *-amd64 carries the OCI index annotations GHCR displays
+      #   - same checks for ARM64
+      # -----------------------------------------------------------------------
+
+      - name: Verify all published images and aliases
+        shell: bash
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+          VARIANT: ${{ matrix.variant }}
+          TITLE: ${{ matrix.title }}
+          DESCRIPTION: ${{ matrix.description }}
+          VERSION: ${{ matrix.version }}
+          SHORT_SHA: ${{ steps.source.outputs.short_sha }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+          IMAGE_SOURCE: ${{ env.IMAGE_SOURCE }}
+          IMAGE_LICENSE: ${{ env.IMAGE_LICENSE }}
+
+          BUILD_DIGEST: ${{ steps.build.outputs.digest }}
+          AMD64_DIGEST: ${{ steps.platforms.outputs.amd64_digest }}
+          ARM64_DIGEST: ${{ steps.platforms.outputs.arm64_digest }}
+        run: |
+          set -Eeuo pipefail
+
+          inspect_raw_with_retry() {
+            local ref="$1"
+            local output=""
+            local attempt
+
+            for attempt in 1 2 3 4 5 6 7 8 9 10; do
+              if output="$(
+                docker buildx imagetools inspect "${ref}" --raw 2>/tmp/imagetools-verify.err
+              )"; then
+                printf '%s' "${output}"
+                return 0
+              fi
+
+              echo \
+                "Waiting for registry consistency: ${ref} (attempt ${attempt}/10)" \
+                >&2
+
+              sleep 3
+            done
+
+            echo "::error::Unable to resolve ${ref} after 10 attempts." >&2
+
+            if [[ -s /tmp/imagetools-verify.err ]]; then
+              cat /tmp/imagetools-verify.err >&2
+            fi
+
+            return 1
+          }
+
+          verify_multi_platform_tag() {
+            local ref="$1"
+            local json
+
+            echo
+            echo "Verifying multi-platform tag:"
+            echo "  ${ref}"
+
+            json="$(inspect_raw_with_retry "${ref}")"
+
+            if ! jq -e \
+              --arg amd64_digest "${AMD64_DIGEST}" \
+              --arg arm64_digest "${ARM64_DIGEST}" \
+              '
+                (.manifests? // []) as $manifests
+                |
+                (
+                  [
+                    $manifests[]
+                    | select(
+                        .platform.os == "linux"
+                        and .platform.architecture == "amd64"
+                        and .digest == $amd64_digest
+                      )
+                  ]
+                  | length
+                ) == 1
+                and
+                (
+                  [
+                    $manifests[]
+                    | select(
+                        .platform.os == "linux"
+                        and .platform.architecture == "arm64"
+                        and .digest == $arm64_digest
+                      )
+                  ]
+                  | length
+                ) == 1
+              ' <<< "${json}" >/dev/null; then
+
+              echo "::error::${ref} does not contain the expected AMD64 and ARM64 manifests."
+              exit 1
+            fi
+
+            echo "  OK: linux/amd64 -> ${AMD64_DIGEST}"
+            echo "  OK: linux/arm64 -> ${ARM64_DIGEST}"
+          }
+
+          verify_platform_alias() {
+            local arch="$1"
+            local expected_digest="$2"
+            local ref="${IMAGE}:${VARIANT}-${arch}"
+            local json
+            local actual_digest
+            local runnable_count
+
+            echo
+            echo "Verifying platform alias:"
+            echo "  ${ref}"
+
+            json="$(inspect_raw_with_retry "${ref}")"
+
+            # The alias must now be an image index / manifest list.
+            if ! jq -e '
+              (.manifests? // []) | length > 0
+            ' <<< "${json}" >/dev/null; then
+
+              echo "::error::${ref} is not an image index."
+              echo "::error::The architecture alias was not created in the expected form."
+              exit 1
+            fi
+
+            # Count runnable manifests.
+            #
+            # Provenance-style unknown/unknown descriptors are ignored if
+            # Buildx ever adds them here in a future release.
+            runnable_count="$(
+              jq -r '
+                [
+                  (.manifests? // [])[ ]
+                  | select(
+                      (.platform.os // "unknown") != "unknown"
+                      and
+                      (.platform.architecture // "unknown") != "unknown"
+                    )
+                ]
+                | length
+              ' <<< "${json}"
+            )"
+
+            if [[ "${runnable_count}" != "1" ]]; then
+              echo "::error::${ref} contains ${runnable_count} runnable manifests; expected exactly 1."
+              exit 1
+            fi
+
+            actual_digest="$(
+              jq -er \
+                --arg arch "${arch}" \
+                '
+                  [
+                    (.manifests? // [])[ ]
+                    | select(
+                        .platform.os == "linux"
+                        and .platform.architecture == $arch
+                      )
+                  ]
+                  |
+                  if length == 1
+                  then .[0].digest
+                  else error(
+                    "Expected exactly one matching platform manifest"
+                  )
+                  end
+                ' <<< "${json}"
+            )"
+
+            if [[ "${actual_digest}" != "${expected_digest}" ]]; then
+              echo "::error::${ref} points to the wrong child manifest."
+              echo "::error::Expected: ${expected_digest}"
+              echo "::error::Actual:   ${actual_digest}"
+              exit 1
+            fi
+
+            # The architecture tag belongs to this wrapper index, so verify
+            # that the wrapper itself carries the OCI metadata GHCR displays.
+            local expected_title="${TITLE} - linux/${arch}"
+            local expected_description="${DESCRIPTION} Platform: linux/${arch}."
+
+            if ! jq -e \
+              --arg title "${expected_title}" \
+              --arg description "${expected_description}" \
+              --arg source "${IMAGE_SOURCE}" \
+              --arg license "${IMAGE_LICENSE}" \
+              --arg version "${VERSION}" \
+              --arg revision "${SOURCE_SHA}" \
+              '
+                (.annotations? // {}) as $a
+                | $a["org.opencontainers.image.title"] == $title
+                  and $a["org.opencontainers.image.description"] == $description
+                  and $a["org.opencontainers.image.source"] == $source
+                  and $a["org.opencontainers.image.url"] == $source
+                  and $a["org.opencontainers.image.licenses"] == $license
+                  and $a["org.opencontainers.image.version"] == $version
+                  and $a["org.opencontainers.image.revision"] == $revision
+              ' <<< "${json}" >/dev/null; then
+
+              echo "::error::${ref} is missing one or more expected OCI index annotations."
+              echo "::error::GHCR may show the tag without title/description metadata."
+              exit 1
+            fi
+
+            echo "  OK: linux/${arch}"
+            echo "  OK: ${actual_digest}"
+            echo "  OK: OCI index title/description/source/version/revision metadata"
+          }
+
+          # All three canonical aliases must resolve to indexes containing
+          # both expected runnable platform manifests.
+          verify_multi_platform_tag \
+            "${IMAGE}:${VARIANT}"
+
+          verify_multi_platform_tag \
+            "${IMAGE}:${VERSION}"
+
+          verify_multi_platform_tag \
+            "${IMAGE}:${VARIANT}-${SHORT_SHA}"
+
+          # Architecture-specific aliases must be one-platform indexes and
+          # must point to the exact children produced by the canonical build.
+          verify_platform_alias \
+            "amd64" \
+            "${AMD64_DIGEST}"
+
+          verify_platform_alias \
+            "arm64" \
+            "${ARM64_DIGEST}"
+
+          echo
+          echo "All registry verification checks passed."
+
+      # -----------------------------------------------------------------------
+      # 7. Human-readable GitHub Actions summary
+      # -----------------------------------------------------------------------
+
+      - name: Write publication summary
+        shell: bash
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+          VARIANT: ${{ matrix.variant }}
+          VERSION: ${{ matrix.version }}
+          SHORT_SHA: ${{ steps.source.outputs.short_sha }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+
+          BUILD_DIGEST: ${{ steps.build.outputs.digest }}
+          AMD64_DIGEST: ${{ steps.platforms.outputs.amd64_digest }}
+          ARM64_DIGEST: ${{ steps.platforms.outputs.arm64_digest }}
+        run: |
+          set -Eeuo pipefail
+
+          {
+            echo "## ${{ matrix.title }}"
+            echo
+            echo "### Source"
+            echo
+            echo "- Baseline: \`${{ matrix.ref }}\`"
+            echo "- Commit: \`${SOURCE_SHA}\`"
+            echo
+            echo "### Canonical multi-platform image"
+            echo
+            echo "- \`${IMAGE}:${VARIANT}\`"
+            echo "- \`${IMAGE}:${VERSION}\`"
+            echo "- \`${IMAGE}:${VARIANT}-${SHORT_SHA}\`"
+            echo
+            echo "Index digest:"
+            echo
+            echo "\`${BUILD_DIGEST}\`"
+            echo
+            echo "### Platform-specific aliases"
+            echo
+            echo "- \`${IMAGE}:${VARIANT}-amd64\`"
+            echo "- \`${IMAGE}:${VARIANT}-arm64\`"
+            echo
+            echo "Platform child manifests:"
+            echo
+            echo "- linux/amd64: \`${AMD64_DIGEST}\`"
+            echo "- linux/arm64: \`${ARM64_DIGEST}\`"
+            echo
+            echo "### Verification"
+            echo
+            echo "All canonical and platform-specific registry checks passed."
+            echo "Platform alias OCI index metadata was also verified."
+          } >> "$GITHUB_STEP_SUMMARY"
