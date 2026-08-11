@@ -254,6 +254,7 @@ biến runtime/deploy của container. Các biến quan trọng nhất cho produ
 | `POSTGRES_PASSWORD` | ✅ | — | Password superuser accessory (`.kamal/secrets`) |
 | `POSTGRES_STATEMENT_TIMEOUT` | Tùy chọn | `5000ms` | `statement_timeout` của PostgreSQL |
 | `DEVISE_JWT_SECRET_KEY` | Khuyến nghị | fallback về `secret_key_base` | Rotate độc lập với master key |
+| `JWT_AUTH_HEADER` | Tùy chọn | `Authorization` | HTTP header vận chuyển access JWT (ví dụ `X-Authorization` khi chạy sau gateway như Beam.cloud) |
 | `CORS_ALLOWED_ORIGINS` | Khuyến nghị | `http://localhost:4000` | Danh sách origin browser được Rack::Cors cho phép, phân tách bằng dấu phẩy |
 | `DEVISE_MAILER_SENDER` | Khuyến nghị | `noreply@example.com` | Đổi sang địa chỉ/domain gửi mail thật |
 | `SOLID_QUEUE_IN_PUMA` | Tùy chọn | `true` | Đặt `false` nếu chạy job worker riêng |
@@ -265,10 +266,10 @@ Trong lúc boot production, app cũng log warning nếu không có khóa JWT đ�
 qua environment hoặc Rails credentials, hoặc nếu `DEVISE_MAILER_SENDER` vẫn còn
 là địa chỉ kiểu placeholder `example.com`.
 
-Nếu browser client chạy khác origin và cần đọc response header `Authorization`
-từ response đăng nhập, hãy cập nhật `config/initializers/cors.rb` để expose
-header đó rõ ràng. Cấu hình CORS hiện tại cho phép origin đã khai báo nhưng chưa
-expose custom response header cho JavaScript cross-origin.
+Browser client chạy khác origin có thể đọc header vận chuyển JWT đã cấu hình
+(`JWT_AUTH_HEADER`, mặc định `Authorization`) từ response đăng nhập:
+`config/initializers/cors.rb` expose header đó qua `expose: [JWT_AUTH_HEADER]`
+và cho phép các request header chuẩn, Beam cũ, và giá trị đã cấu hình.
 
 ---
 
