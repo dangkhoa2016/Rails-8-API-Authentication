@@ -382,7 +382,7 @@ Branch này thay SQLite baseline bằng PostgreSQL cho các thay đổi tương 
 **không** copy các row SQLite đang hoạt động. Một cutover thực sự cần kiểm kê
 row, thứ tự foreign key, reset sequence, count/checksum, diễn tập, cửa sổ
 freeze, và kế hoạch rollback — tất cả nằm ngoài phạm vi. Coi variant SQLite
-(khôi phục được tại tag `sqlite-baseline-v1`) là điểm khôi phục trước migration,
+(khôi phục được tại tag `baseline-sqlite-v1`) là điểm khôi phục trước migration,
 và chỉ phục hồi bản sao PostgreSQL vào target non-production đã xác minh.
 
 ---

@@ -23,10 +23,10 @@ GitHub login or package token.
 
 Two publishable image variants exist, one per database backend:
 
-| Image | Database | Built from tag | Commit |
+| Image | Database | Built from branch | Commit |
 | --- | --- | --- | --- |
-| `ghcr.io/dangkhoa2016/rails-8-api-authentication:postgres` | PostgreSQL 17 | `postgresql-baseline-v1` | `9d4a7f0` |
-| `ghcr.io/dangkhoa2016/rails-8-api-authentication:sqlite` | SQLite | `sqlite-baseline-v1` | `34ae7e6` |
+| `ghcr.io/dangkhoa2016/rails-8-api-authentication:postgresql` | PostgreSQL 17 | `baseline/postgresql-v1` | `6897c77` |
+| `ghcr.io/dangkhoa2016/rails-8-api-authentication:sqlite` | SQLite | `baseline/sqlite-v1` | `1d842b1` |
 
 Both images share the same runtime behaviour:
 
@@ -35,16 +35,17 @@ Both images share the same runtime behaviour:
 - Ship **no secrets**: only `RAILS_ENV=production` is baked in. Database URLs,
   `SECRET_KEY_BASE`, and admin credentials must be provided at run time through
   environment variables (the Docker build ignores `.env*` and `config/master.key`).
-- Are built from immutable **Git baseline tags**, so the exact application source used
-  for each published variant can be recovered. Note that this does not by itself make
-  the complete Docker build bit-for-bit reproducible because upstream base-image tags
-  and operating-system packages can change over time.
+- Are built from **Git baseline branches**, so the exact application source used for
+  each published variant can be recovered. The `baseline/postgresql-v1` and
+  `baseline/sqlite-v1` branches are the living source lines for each variant; the
+  `baseline-postgresql-v1` and `baseline-sqlite-v1` tags record immutable release
+  snapshots of those baselines. Note that this does not by itself make the complete
+  Docker build bit-for-bit reproducible because upstream base-image tags and
+  operating-system packages can change over time.
 
-> The `Commit` column lists the current `HEAD` of each baseline tag. The baseline tags
-> are **annotated tags**, and the value shown is the commit the tag points to
-> (`git rev-parse <tag>^{commit}`), which is what a checkout resolves to — not the tag
-> object's own hash (`git rev-parse <tag>`). The workflow resolves the short SHA at
-> publish time (`git rev-parse --short=7 HEAD`), so the `-<sha>` tag and the
+> The `Commit` column lists the current `HEAD` of each baseline branch
+> (`git rev-parse <branch>`). The workflow resolves the short SHA at publish time
+> (`git rev-parse --short=7 HEAD`), so the `-<sha>` tag and the
 > `org.opencontainers.image.revision` label always reflect the exact source commit
 > behind the published image.
 
@@ -81,11 +82,11 @@ Publish a convenient moving tag plus immutable/version-specific tags.
 PostgreSQL:
 
 ```text
-ghcr.io/dangkhoa2016/rails-8-api-authentication:postgres
-ghcr.io/dangkhoa2016/rails-8-api-authentication:postgres-v1
-ghcr.io/dangkhoa2016/rails-8-api-authentication:postgres-64d8f32
-ghcr.io/dangkhoa2016/rails-8-api-authentication:postgres-amd64
-ghcr.io/dangkhoa2016/rails-8-api-authentication:postgres-arm64
+ghcr.io/dangkhoa2016/rails-8-api-authentication:postgresql
+ghcr.io/dangkhoa2016/rails-8-api-authentication:postgresql-v1
+ghcr.io/dangkhoa2016/rails-8-api-authentication:postgresql-6897c77
+ghcr.io/dangkhoa2016/rails-8-api-authentication:postgresql-amd64
+ghcr.io/dangkhoa2016/rails-8-api-authentication:postgresql-arm64
 ```
 
 SQLite:
@@ -93,24 +94,24 @@ SQLite:
 ```text
 ghcr.io/dangkhoa2016/rails-8-api-authentication:sqlite
 ghcr.io/dangkhoa2016/rails-8-api-authentication:sqlite-v1
-ghcr.io/dangkhoa2016/rails-8-api-authentication:sqlite-34ae7e6
+ghcr.io/dangkhoa2016/rails-8-api-authentication:sqlite-1d842b1
 ghcr.io/dangkhoa2016/rails-8-api-authentication:sqlite-amd64
 ghcr.io/dangkhoa2016/rails-8-api-authentication:sqlite-arm64
 ```
 
-Users who want the current variant can use `:postgres` or `:sqlite`. Users who want a
+Users who want the current variant can use `:postgresql` or `:sqlite`. Users who want a
 stable deployment should pin a version or commit tag.
 
-The `-<sha>` tag is generated at publish time from the `HEAD` of each baseline tag, so
+The `-<sha>` tag is generated at publish time from the `HEAD` of each baseline branch, so
 it always reflects the exact source commit behind the published image. The
-`:postgres-amd64` / `:postgres-arm64` and `:sqlite-amd64` / `:sqlite-arm64` aliases
+`:postgresql-amd64` / `:postgresql-arm64` and `:sqlite-amd64` / `:sqlite-arm64` aliases
 point to the same published platform manifests, which is handy when inspecting a
 single architecture on the GHCR "Versions" page.
 
 ## Requirements for manual publishing
 
 - Docker with Buildx enabled (`docker buildx version`).
-- The baseline Git tags available locally: `git fetch --tags`.
+- The baseline Git branches available locally: `git fetch origin baseline/postgresql-v1 baseline/sqlite-v1`.
 - For command-line publishing to GHCR: a **GitHub Personal Access Token (classic)**
   with the `write:packages` scope, owned by `dangkhoa2016` or the target account.
 - Docker Desktop normally provides the required emulation support automatically.
@@ -173,36 +174,36 @@ The platform list should include both `linux/amd64` and `linux/arm64`.
 
 ## Step 3 — Build and push the images
 
-Build from the immutable baseline Git tags so each published variant uses the exact
+Build from the baseline Git branches so each published variant uses the exact
 application source associated with that baseline.
 
 ```bash
 REPOSITORY="https://github.com/dangkhoa2016/Rails-8-API-Authentication"
 
 TMP="$(mktemp -d)"
-git archive postgresql-baseline-v1 | tar -x -C "$TMP"
+git archive baseline/postgresql-v1 | tar -x -C "$TMP"
 
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
   --label "org.opencontainers.image.source=$REPOSITORY" \
-  --label "org.opencontainers.image.revision=64d8f32" \
-  -t ghcr.io/dangkhoa2016/rails-8-api-authentication:postgres \
-  -t ghcr.io/dangkhoa2016/rails-8-api-authentication:postgres-v1 \
-  -t ghcr.io/dangkhoa2016/rails-8-api-authentication:postgres-64d8f32 \
+  --label "org.opencontainers.image.revision=6897c77" \
+  -t ghcr.io/dangkhoa2016/rails-8-api-authentication:postgresql \
+  -t ghcr.io/dangkhoa2016/rails-8-api-authentication:postgresql-v1 \
+  -t ghcr.io/dangkhoa2016/rails-8-api-authentication:postgresql-6897c77 \
   --push "$TMP"
 
 rm -rf "$TMP"
 
 TMP="$(mktemp -d)"
-git archive sqlite-baseline-v1 | tar -x -C "$TMP"
+git archive baseline/sqlite-v1 | tar -x -C "$TMP"
 
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
   --label "org.opencontainers.image.source=$REPOSITORY" \
-  --label "org.opencontainers.image.revision=34ae7e6" \
+  --label "org.opencontainers.image.revision=1d842b1" \
   -t ghcr.io/dangkhoa2016/rails-8-api-authentication:sqlite \
   -t ghcr.io/dangkhoa2016/rails-8-api-authentication:sqlite-v1 \
-  -t ghcr.io/dangkhoa2016/rails-8-api-authentication:sqlite-34ae7e6 \
+  -t ghcr.io/dangkhoa2016/rails-8-api-authentication:sqlite-1d842b1 \
   --push "$TMP"
 
 rm -rf "$TMP"
@@ -229,7 +230,7 @@ Do not assume a push produced both architectures. Inspect each published tag:
 
 ```bash
 docker buildx imagetools inspect \
-  ghcr.io/dangkhoa2016/rails-8-api-authentication:postgres
+  ghcr.io/dangkhoa2016/rails-8-api-authentication:postgresql
 
 docker buildx imagetools inspect \
   ghcr.io/dangkhoa2016/rails-8-api-authentication:sqlite
@@ -274,7 +275,7 @@ After making the package public, verify anonymously from a logged-out Docker cli
 ```bash
 docker logout ghcr.io 2>/dev/null || true
 docker pull ghcr.io/dangkhoa2016/rails-8-api-authentication:sqlite
-docker pull ghcr.io/dangkhoa2016/rails-8-api-authentication:postgres
+docker pull ghcr.io/dangkhoa2016/rails-8-api-authentication:postgresql
 ```
 
 ## Step 6 — Run the images
@@ -320,7 +321,7 @@ docker run -d \
   --name rails-postgres \
   --env-file .env.production.local \
   -p 80:80 \
-  ghcr.io/dangkhoa2016/rails-8-api-authentication:postgres
+  ghcr.io/dangkhoa2016/rails-8-api-authentication:postgresql
 ```
 
 If PostgreSQL runs directly on the Docker host rather than on another reachable
@@ -417,14 +418,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - variant: postgres
-            ref: postgresql-baseline-v1
-            version: postgres-v1
+          - variant: postgresql
+            ref: baseline/postgresql-v1
+            version: postgresql-v1
             title: Rails 8 API Authentication - PostgreSQL
             description: Rails 8 API authentication service with Devise, JWT, and PostgreSQL support.
 
           - variant: sqlite
-            ref: sqlite-baseline-v1
+            ref: baseline/sqlite-v1
             version: sqlite-v1
             title: Rails 8 API Authentication - SQLite
             description: Rails 8 API authentication service with Devise, JWT, and SQLite support.
@@ -531,8 +532,8 @@ jobs:
       # These aliases improve the GHCR "Versions" page because the four runnable
       # child manifests no longer appear only as anonymous sha256 digests:
       #
-      #   postgres-amd64
-      #   postgres-arm64
+      #   postgresql-amd64
+      #   postgresql-arm64
       #   sqlite-amd64
       #   sqlite-arm64
       #

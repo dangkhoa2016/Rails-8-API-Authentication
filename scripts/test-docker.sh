@@ -7,8 +7,8 @@
 #    bash scripts/test-docker.sh --database sqlite
 #
 #  postgres mode (default):
-#    - Builds `rails-8-api-authentication:postgres` from the immutable tag
-#      `postgresql-baseline-v1` (64d8f32..., tip of origin/feat/postgresql).
+#    - Builds `rails-8-api-authentication:postgresql` from the baseline branch
+#      `baseline/postgresql-v1` (6897c77..., contains the JWT auth feature).
 #    - Starts a dedicated `postgres:17` container on a bridge network and
 #      creates the production / cache / queue / cable databases.
 #    - Runs the app on the host network (Rails/Puma on :4000) with the
@@ -17,14 +17,15 @@
 #      container.
 #
 #  sqlite mode:
-#    - Builds `rails-8-api-authentication:sqlite` from the immutable tag
-#      `sqlite-baseline-v1` (34ae7e6..., tip of origin/main). SQLite databases
-#      live in storage/ inside the image, so no database container is needed.
+#    - Builds `rails-8-api-authentication:sqlite` from the baseline branch
+#      `baseline/sqlite-v1` (1d842b1..., contains the JWT auth feature). SQLite
+#      databases live in storage/ inside the image, so no database container is
+#      needed.
 #    - Runs the app on the host network with the environment from `.env.sqlite`
 #      (fallback `.env`) plus a generated SECRET_KEY_BASE.
 #
 #  Both modes build the image from a clean `git archive` snapshot of the
-#  baseline tag (the working tree cannot leak in), wait for readiness on
+#  baseline branch (the working tree cannot leak in), wait for readiness on
 #  /up, run scripts/test_all.sh against the container, and always tear down
 #  containers and the network on exit.
 #
@@ -77,13 +78,13 @@ Usage: bash scripts/test-docker.sh [--database postgres|sqlite]
 
 Build and test the Rails 8 API Docker image against a real database.
 
-  --database postgres    PostgreSQL mode (default): postgresql-baseline-v1
+  --database postgres    PostgreSQL mode (default): baseline/postgresql-v1
                          + a dedicated postgres:17 container.
-  --database sqlite      SQLite mode: sqlite-baseline-v1 (main); no DB
+  --database sqlite      SQLite mode: baseline/sqlite-v1; no DB
                          container needed, databases live in storage/.
   -h, --help             Show this help and exit.
 
-Both modes build from the immutable baseline tag via git archive, run the app
+Both modes build from the baseline branch via git archive, run the app
 on the host network, wait for /up, run scripts/test_all.sh, and tear down.
 
 Optional env vars: PROJECT_DIR, API_BASE_URL, SERVER_START_TIMEOUT,
@@ -126,8 +127,8 @@ esac
 # --- Backend-specific configuration --------------------------------------------
 case "$DATABASE" in
   postgres)
-    IMAGE_NAME="rails-8-api-authentication:postgres"
-    BASELINE_TAG="postgresql-baseline-v1"
+    IMAGE_NAME="rails-8-api-authentication:postgresql"
+    BASELINE_REF="baseline/postgresql-v1"
     ENV_FILE_BASE=".env.postgres"
     PG_IMAGE="postgres:17"
     PG_USER="postgres"
@@ -136,7 +137,7 @@ case "$DATABASE" in
     ;;
   sqlite)
     IMAGE_NAME="rails-8-api-authentication:sqlite"
-    BASELINE_TAG="sqlite-baseline-v1"
+    BASELINE_REF="baseline/sqlite-v1"
     ENV_FILE_BASE=".env.sqlite"
     ;;
 esac
@@ -170,15 +171,15 @@ done
 
 docker info >/dev/null 2>&1 || fail "docker daemon is not reachable (is dockerd running?)"
 
-# --- Verify the immutable baseline tag ------------------------------------------
+# --- Verify the baseline branch ---------------------------------------------------
 if [[ ! -d "$PROJECT_DIR/.git" ]]; then
   fail "Not a git repository: $PROJECT_DIR"
 fi
-TAG_COMMIT="$(git -C "$PROJECT_DIR" rev-parse --verify "refs/tags/$BASELINE_TAG^{commit}" 2>/dev/null || true)"
-if [[ -z "$TAG_COMMIT" ]]; then
-  fail "Tag '$BASELINE_TAG' not found in $PROJECT_DIR"
+REF_COMMIT="$(git -C "$PROJECT_DIR" rev-parse --verify "refs/heads/$BASELINE_REF" 2>/dev/null || true)"
+if [[ -z "$REF_COMMIT" ]]; then
+  fail "Branch '$BASELINE_REF' not found in $PROJECT_DIR"
 fi
-log "Using $DATABASE baseline: tag $BASELINE_TAG ($TAG_COMMIT)"
+log "Using $DATABASE baseline: branch $BASELINE_REF ($REF_COMMIT)"
 
 # --- Pick the environment file: backend-specific, then .env fallback -------------
 if [[ -f "$PROJECT_DIR/$ENV_FILE_BASE" ]]; then
@@ -190,20 +191,20 @@ else
 fi
 log "Using environment file: $ENV_FILE"
 
-# --- Build the image from a clean snapshot of the baseline tag -------------------
-log "Building $IMAGE_NAME from tag $BASELINE_TAG ($TAG_COMMIT)..."
+# --- Build the image from a clean snapshot of the baseline branch -----------------
+log "Building $IMAGE_NAME from branch $BASELINE_REF ($REF_COMMIT)..."
 # The docker daemon may run on a different host than this workspace (e.g. a
 # devcontainer), so BUILD_DIR must live under a path the daemon can see for the
 # postgres init-script bind mount below to work (a missing host path would be
 # silently created as an empty directory and break the init step).
 mkdir -p "$PROJECT_DIR/tmp"
 BUILD_DIR="$(mktemp -d "$PROJECT_DIR/tmp/docker-build.XXXXXX")"
-git -C "$PROJECT_DIR" archive "$BASELINE_TAG" | tar -x -C "$BUILD_DIR"
+git -C "$PROJECT_DIR" archive "$BASELINE_REF" | tar -x -C "$BUILD_DIR"
 if [[ ! -f "$BUILD_DIR/Dockerfile" ]]; then
-  fail "Dockerfile not found in tag $BASELINE_TAG"
+  fail "Dockerfile not found in branch $BASELINE_REF"
 fi
 if [[ "$DATABASE" == "postgres" && ! -f "$BUILD_DIR/config/postgres/init-databases.sql" ]]; then
-  fail "config/postgres/init-databases.sql not found in tag $BASELINE_TAG"
+  fail "config/postgres/init-databases.sql not found in branch $BASELINE_REF"
 fi
 docker build -t "$IMAGE_NAME" "$BUILD_DIR"
 
