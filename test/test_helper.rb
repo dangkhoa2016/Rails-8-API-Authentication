@@ -33,8 +33,16 @@ require "devise"
 require "devise/jwt/test_helpers"
 require "securerandom"
 
+module JwtHeaderHelpers
+  def jwt_auth_header_name
+    Warden::JWTAuth.config.token_header
+  end
+end
+
 module ActiveSupport
   class TestCase
+    include JwtHeaderHelpers
+
     # Run tests in parallel with specified workers
     # (single-process when measuring coverage so SimpleCov results are complete)
     parallelize(workers: :number_of_processors) unless ENV["COVERAGE"]
@@ -79,6 +87,7 @@ end
 
 class ActionDispatch::IntegrationTest
   include Devise::Test::IntegrationHelpers
+  include JwtHeaderHelpers
 
   def json_response
     JSON.parse(response.body)
@@ -92,15 +101,15 @@ class ActionDispatch::IntegrationTest
   end
 
   def authorization_headers(token)
-    json_headers.merge("Authorization" => "Bearer #{token}")
+    json_headers.merge(jwt_auth_header_name => "Bearer #{token}")
   end
 
   def bearer_token_from_headers(headers)
-    headers.fetch("Authorization").delete_prefix("Bearer ")
+    headers.fetch(jwt_auth_header_name).delete_prefix("Bearer ")
   end
 
   def bearer_token_from_response
-    response.headers.fetch("Authorization", "").delete_prefix("Bearer ")
+    response.headers.fetch(jwt_auth_header_name, "").delete_prefix("Bearer ")
   end
 
   def expired_token_for(user, issued_at: 2.hours.ago, expired_at: 1.hour.ago)

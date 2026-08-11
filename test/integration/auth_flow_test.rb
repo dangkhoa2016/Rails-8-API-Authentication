@@ -78,27 +78,4 @@ class AuthFlowTest < ActionDispatch::IntegrationTest
     assert_equal jti, payload.fetch("jti")
     assert JwtDenylist.exists?(jti: jti)
   end
-
-  private
-
-  def json_response
-    JSON.parse(response.body)
-  end
-
-  def authorization_headers(token)
-    { "Authorization" => "Bearer #{token}" }
-  end
-
-  def bearer_token_from_response
-    response.headers.fetch("Authorization", "").delete_prefix("Bearer ")
-  end
-
-  def confirmation_token_from_last_email
-    body = ActionMailer::Base.deliveries.last.body.encoded
-    match = body.match(/confirmation_token=([^\"]+)/)
-
-    assert_not_nil match, "Expected confirmation token in email body"
-
-    CGI.unescape(match[1])
-  end
 end

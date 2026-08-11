@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../../lib/jwt_auth_header"
+
 # Assuming you have not yet modified this file, each configuration option below
 # is set to its default value. Note that some are commented out while others
 # are not: uncommented lines are intended to protect your configuration from
@@ -289,5 +291,6 @@ Devise.setup do |config|
       Rails.application.secret_key_base
     jwt.expiration_time = 15.minutes.to_i
     jwt.request_formats = { user: [ nil, :json ] }
+    jwt.token_header = JwtAuthHeader.name
   end
 end

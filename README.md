@@ -154,7 +154,7 @@ bin/rails runner 'puts User.find_by!(email: "user@example.com").confirmation_tok
 curl -sS "http://localhost:4000/users/confirmation?confirmation_token=<token>" | jq .
 ```
 
-5. Sign in and capture the JWT from the `Authorization` response header.
+5. Sign in and capture the JWT from the configured response header (default `Authorization`, see [JWT transport header](#jwt-transport-header)).
 
 ```bash
 TOKEN=$(curl -is -X POST http://localhost:4000/users/sign_in \
@@ -164,21 +164,21 @@ TOKEN=$(curl -is -X POST http://localhost:4000/users/sign_in \
       "email": "user@example.com",
       "password": "Password1!"
     }
-  }' | sed -n 's/^authorization: Bearer //p' | tr -d '\r')
+  }' | tr -d '\r' | sed -n "s/^$(echo "${JWT_AUTH_HEADER:-Authorization}" | tr '[:upper:]' '[:lower:]'): Bearer //p")
 ```
 
 6. Read the primary profile endpoint with that JWT.
 
 ```bash
 curl -sS http://localhost:4000/user/profile \
-  -H "Authorization: Bearer ${TOKEN}" | jq .
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer ${TOKEN}" | jq .
 ```
 
 7. Sign out and revoke the token.
 
 ```bash
 curl -sS -X DELETE http://localhost:4000/users/sign_out \
-  -H "Authorization: Bearer ${TOKEN}" | jq .
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer ${TOKEN}" | jq .
 ```
 
 8. Optionally inspect the broader request references in `manual/session.sh`, `manual/registration.sh`, `manual/password.sh`, and `manual/user.sh` for invalid-token, expired-token, password-reset, and admin/user-management examples.
@@ -214,7 +214,43 @@ never be reused for production. Statement timeouts are controlled with
 
 If you do not set `PORT`, `bin/dev` boots on `4000` locally. The shipped `.env.sample` sets `PORT=4000`, so copying it unchanged moves local development to `http://localhost:4000`. The full variable reference — including production secrets, Puma concurrency, mailer, admin seed, CORS, and the manual JWT token slot — is documented in `.env.sample`.
 
-For browser clients running on a different origin, the default CORS config allows requests from `CORS_ALLOWED_ORIGINS` but does **not** expose the `Authorization` response header. If your frontend needs to read the JWT from the sign-in response, update `config/initializers/cors.rb` to expose that header explicitly.
+For browser clients running on a different origin, the CORS config allows requests from `CORS_ALLOWED_ORIGINS` and exposes the configured JWT response header (`expose: [JWT_AUTH_HEADER]` in `config/initializers/cors.rb`), so browser clients can read the JWT from the sign-in response.
+
+### JWT transport header
+
+The access JWT is returned and accepted in a configurable HTTP header. The default preserves the standard convention:
+
+| Environment | `JWT_AUTH_HEADER` | Client header |
+|---|---|---|
+| Local / Docker | `Authorization` | `Authorization: Bearer <JWT>` |
+| Standard reverse proxy | `Authorization` | `Authorization: Bearer <JWT>` |
+| Beam.cloud workaround | `X-Authorization` | `X-Authorization: Bearer <JWT>` |
+
+```env
+# Default / normal hosting providers
+JWT_AUTH_HEADER=Authorization
+```
+
+Client:
+
+```http
+Authorization: Bearer <JWT>
+```
+
+During testing on the Beam Pod URL used for this project, requests carrying the Rails JWT in the standard `Authorization` header were intercepted before reaching Rails. Configuring Rails to use `X-Authorization` avoids that header collision. This is a provider/deployment-specific transport workaround, not a change to JWT cryptography.
+
+```env
+# Beam.cloud workaround
+JWT_AUTH_HEADER=X-Authorization
+```
+
+Client:
+
+```http
+X-Authorization: Bearer <JWT>
+```
+
+The JWT itself, its signing secret, and its claims are identical in both modes; only the HTTP transport header changes. `JWT_AUTH_HEADER` is read by both the Devise JWT strategy (`config/initializers/devise.rb`) and the CORS expose-header config, so it only needs to be set in one place. The standard `Authorization` header remains the default and recommended value when the hosting provider forwards it unchanged.
 
 ## Code Coverage
 
@@ -349,13 +385,13 @@ curl -i -X POST http://localhost:4000/users/sign_in \
   }'
 ```
 
-The JWT is returned in the `Authorization` response header.
+The JWT is returned in the configured response header (`JWT_AUTH_HEADER`, default `Authorization`).
 
 ### 4. Read Profile
 
 ```bash
 curl http://localhost:4000/user/profile \
-  -H "Authorization: Bearer <jwt_token>"
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer <jwt_token>"
 ```
 
 `/user/me` and `/user/whoami` are compatibility aliases for the same response.
@@ -364,7 +400,7 @@ curl http://localhost:4000/user/profile \
 
 ```bash
 curl -X DELETE http://localhost:4000/users/sign_out \
-  -H "Authorization: Bearer <jwt_token>"
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer <jwt_token>"
 ```
 
 ## Manual References

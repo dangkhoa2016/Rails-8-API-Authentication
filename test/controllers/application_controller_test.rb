@@ -22,7 +22,7 @@ class TestSessionsController < Users::SessionsController
 
   def request
     @_request ||= ActionDispatch::Request.new(Rack::MockRequest.env_for("/user/profile", {
-      "HTTP_AUTHORIZATION" => "Bearer #{@token}",
+      "HTTP_#{Warden::JWTAuth.config.token_header.upcase.tr('-', '_')}" => "Bearer #{@token}",
       "CONTENT_TYPE" => "application/json"
     }))
   end
@@ -104,10 +104,10 @@ class ApplicationControllerTest < ActiveSupport::TestCase
 
   test "build_token_info decodes payload from token when token_info lacks payload" do
     user = confirmed_user("unit_test@example.local")
-    token = jwt_auth_headers_for(user).fetch("Authorization").delete_prefix("Bearer ")
+    token = jwt_auth_headers_for(user).fetch(jwt_auth_header_name).delete_prefix("Bearer ")
 
     controller = TestSessionsController.new
-    env = Rack::MockRequest.env_for("/user/profile", "HTTP_AUTHORIZATION" => "Bearer #{token}")
+    env = Rack::MockRequest.env_for("/user/profile", "HTTP_#{jwt_auth_header_name.upcase.tr('-', '_')}" => "Bearer #{token}")
     fake_warden = Struct.new(:env).new(env)
     controller.define_singleton_method(:warden) { fake_warden }
 
@@ -120,7 +120,7 @@ class ApplicationControllerTest < ActiveSupport::TestCase
 
   test "build_token_info uses existing payload from token_info when available" do
     user = confirmed_user("unit_test2@example.local")
-    token = jwt_auth_headers_for(user).fetch("Authorization").delete_prefix("Bearer ")
+    token = jwt_auth_headers_for(user).fetch(jwt_auth_header_name).delete_prefix("Bearer ")
     payload = decode_jwt(token)
 
     controller = TestSessionsController.new

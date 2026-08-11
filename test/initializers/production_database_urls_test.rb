@@ -127,7 +127,7 @@ class ProductionDatabaseUrlsTest < ActiveSupport::TestCase
   end
 
   test "apply! raises before writing ENV when a URL is invalid" do
-    names = ProductionDatabaseUrls::NAMES
+    names = ProductionDatabaseUrls::NAMES + %w[POSTGRES_HOST POSTGRES_USER POSTGRES_PASSWORD]
     original = names.to_h { |name| [ name, ENV[name] ] }
 
     ENV["DATABASE_URL"] = "postgresql-BỊ-SAI://host/db"
@@ -139,7 +139,8 @@ class ProductionDatabaseUrlsTest < ActiveSupport::TestCase
       ProductionDatabaseUrls.apply!(environment: "production")
     end
     assert_equal "postgresql-BỊ-SAI://host/db", ENV["DATABASE_URL"]
-    assert_nil ENV["CACHE_DATABASE_URL"]
+    untouched = ProductionDatabaseUrls::NAMES - %w[DATABASE_URL]
+    assert_equal untouched.map { |name| original[name] }, untouched.map { |name| ENV[name] }
   ensure
     original.each do |name, value|
       value.nil? ? ENV.delete(name) : ENV[name] = value
