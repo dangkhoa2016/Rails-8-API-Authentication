@@ -111,19 +111,19 @@ curl -X POST -H "Content-Type: application/json" -d '{
 {"error":"Invalid Email or password."}
 
 # 5 - Sign Out: Valid Token
-curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MTAyODUwLCJleHAiOjE3MzcxMDY0NTAsImp0aSI6IjQ1OWEzMzhmLTA3MzgtNDJkYi04ODZmLTc5ZjM1MTliODc5OCJ9.7so7q1Mo_sJku4H_wpseN-fw4l8gigqU64zOpu4UmZc" \
+curl -X DELETE -H "Content-Type: application/json" -H "${JWT_AUTH_HEADER:-Authorization}: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MTAyODUwLCJleHAiOjE3MzcxMDY0NTAsImp0aSI6IjQ1OWEzMzhmLTA3MzgtNDJkYi04ODZmLTc5ZjM1MTliODc5OCJ9.7so7q1Mo_sJku4H_wpseN-fw4l8gigqU64zOpu4UmZc" \
 "http://localhost:4000/users/sign_out" | jq .
 {
   "message": "Your account: user@example.com has been signed out successfully."
 }
 
 # 5 - Sign Out: Invalid Token
-curl -X DELETE -H "Content-Type: application/json" -H "Authorization: Bearer test" \
+curl -X DELETE -H "Content-Type: application/json" -H "${JWT_AUTH_HEADER:-Authorization}: Bearer test" \
 "http://localhost:4000/users/sign_out" -i
 {"error":"Invalid token"}
 
 # 6 - Get Signed In User JSON Data
-curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MjYxNTk3LCJleHAiOjE3MzcyNjUxOTcsImp0aSI6IjNlNGNlYmZmLTRkZGMtNGMzNy05MTI1LTBkNjdhMWM2ODAxZSJ9.5lHosClrKK6fK52ONzhxFR-uTt5Lc5mYPSwSkLs31gw" \
+curl -X GET -H "Content-Type: application/json" -H "${JWT_AUTH_HEADER:-Authorization}: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MjYxNTk3LCJleHAiOjE3MzcyNjUxOTcsImp0aSI6IjNlNGNlYmZmLTRkZGMtNGMzNy05MTI1LTBkNjdhMWM2ODAxZSJ9.5lHosClrKK6fK52ONzhxFR-uTt5Lc5mYPSwSkLs31gw" \
 "http://localhost:4000/user/profile" | jq .
 {
   "user": {
@@ -149,7 +149,7 @@ curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbG
 }
 
 # 6 - Get Signed In User JSON Data
-curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MjYxNTk3LCJleHAiOjE3MzcyNjUxOTcsImp0aSI6IjNlNGNlYmZmLTRkZGMtNGMzNy05MTI1LTBkNjdhMWM2ODAxZSJ9.5lHosClrKK6fK52ONzhxFR-uTt5Lc5mYPSwSkLs31gw" \
+curl -X GET -H "Content-Type: application/json" -H "${JWT_AUTH_HEADER:-Authorization}: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MjYxNTk3LCJleHAiOjE3MzcyNjUxOTcsImp0aSI6IjNlNGNlYmZmLTRkZGMtNGMzNy05MTI1LTBkNjdhMWM2ODAxZSJ9.5lHosClrKK6fK52ONzhxFR-uTt5Lc5mYPSwSkLs31gw" \
 "http://localhost:4000/user/me" | jq .
 {
   "user": {
@@ -175,7 +175,7 @@ curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbG
 }
 
 # 6 - Get Signed In User JSON Data
-curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MjYxNTk3LCJleHAiOjE3MzcyNjUxOTcsImp0aSI6IjNlNGNlYmZmLTRkZGMtNGMzNy05MTI1LTBkNjdhMWM2ODAxZSJ9.5lHosClrKK6fK52ONzhxFR-uTt5Lc5mYPSwSkLs31gw" \
+curl -X GET -H "Content-Type: application/json" -H "${JWT_AUTH_HEADER:-Authorization}: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MjYxNTk3LCJleHAiOjE3MzcyNjUxOTcsImp0aSI6IjNlNGNlYmZmLTRkZGMtNGMzNy05MTI1LTBkNjdhMWM2ODAxZSJ9.5lHosClrKK6fK52ONzhxFR-uTt5Lc5mYPSwSkLs31gw" \
 "http://localhost:4000/user/whoami" | jq .
 {
   "user": {
@@ -201,14 +201,14 @@ curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbG
 }
 
 # 7 - Get Signed In User JSON Data: Invalid Token
-curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MTIxMzEzLCJleHAiOjE3MzcxMjQ5MTMsImp0aSI6Ijk0Njg1Mzg0LWRhODktNGYxYS1iODQ5LTExNGM0YzdhZDRmOSJ9.J1mlfI4_aGwS1h2buVXolYq7vIQGiDtnwBN9_QtVnDk" \
+curl -X GET -H "Content-Type: application/json" -H "${JWT_AUTH_HEADER:-Authorization}: Bearer eyJhbGciOiIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MTIxMzEzLCJleHAiOjE3MzcxMjQ5MTMsImp0aSI6Ijk0Njg1Mzg0LWRhODktNGYxYS1iODQ5LTExNGM0YzdhZDRmOSJ9.J1mlfI4_aGwS1h2buVXolYq7vIQGiDtnwBN9_QtVnDk" \
 "http://localhost:4000/user/profile" | jq .
 {
   "error": "Invalid token"
 }
 
 # 7 - Get Signed In User JSON Data: Expired Token
-curl -X GET -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MTAyODUwLCJleHAiOjE3MzcxMDY0NTAsImp0aSI6IjQ1OWEzMzhmLTA3MzgtNDJkYi04ODZmLTc5ZjM1MTliODc5OCJ9.7so7q1Mo_sJku4H_wpseN-fw4l8gigqU64zOpu4UmZc" \
+curl -X GET -H "Content-Type: application/json" -H "${JWT_AUTH_HEADER:-Authorization}: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIyIiwic2NwIjoidXNlciIsImF1ZCI6bnVsbCwiaWF0IjoxNzM3MTAyODUwLCJleHAiOjE3MzcxMDY0NTAsImp0aSI6IjQ1OWEzMzhmLTA3MzgtNDJkYi04ODZmLTc5ZjM1MTliODc5OCJ9.7so7q1Mo_sJku4H_wpseN-fw4l8gigqU64zOpu4UmZc" \
 "http://localhost:4000/user/profile" | jq .
 {
   "user": null,

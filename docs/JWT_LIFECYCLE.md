@@ -16,11 +16,11 @@ This document explains the full lifecycle of a JWT within the system — from cr
   → stores token + payload in user.token_info (attr_accessor, in-memory)
         │
         ▼
-  JWT returned in response header: Authorization: Bearer <token>
+  JWT returned in response header: <JWT_AUTH_HEADER (default: Authorization)>: Bearer <token>
         │
         ▼
   Client stores token, sends it with every subsequent request:
-  Authorization: Bearer <token>
+  <JWT_AUTH_HEADER (default: Authorization)>: Bearer <token>
         │
         ▼
   Warden::JWTAuth::Strategy.authenticate!

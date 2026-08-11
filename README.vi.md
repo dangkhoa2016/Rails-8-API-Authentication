@@ -140,7 +140,7 @@ bin/rails runner 'puts User.find_by!(email: "user@example.com").confirmation_tok
 curl -sS "http://localhost:4000/users/confirmation?confirmation_token=<token>" | jq .
 ```
 
-5. Đăng nhập và lấy JWT từ header `Authorization` trong response.
+5. Đăng nhập và lấy JWT từ header đã cấu hình trong response (mặc định là `Authorization`, xem [JWT transport header](#jwt-transport-header)).
 
 ```bash
 TOKEN=$(curl -is -X POST http://localhost:4000/users/sign_in \
@@ -150,21 +150,21 @@ TOKEN=$(curl -is -X POST http://localhost:4000/users/sign_in \
       "email": "user@example.com",
       "password": "Password1!"
     }
-  }' | sed -n 's/^authorization: Bearer //p' | tr -d '\r')
+  }' | tr -d '\r' | sed -n "s/^$(echo "${JWT_AUTH_HEADER:-Authorization}" | tr '[:upper:]' '[:lower:]'): Bearer //p")
 ```
 
 6. Gọi endpoint profile với JWT.
 
 ```bash
 curl -sS http://localhost:4000/user/profile \
-  -H "Authorization: Bearer ${TOKEN}" | jq .
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer ${TOKEN}" | jq .
 ```
 
 7. Đăng xuất và thu hồi token.
 
 ```bash
 curl -sS -X DELETE http://localhost:4000/users/sign_out \
-  -H "Authorization: Bearer ${TOKEN}" | jq .
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer ${TOKEN}" | jq .
 ```
 
 8. (Tùy chọn) Tham khảo thêm các request trong `manual/session.sh`, `manual/registration.sh`, `manual/password.sh`, và `manual/user.sh` cho các trường hợp token không hợp lệ, token hết hạn, reset mật khẩu, và ví dụ quản lý user/admin.
@@ -188,7 +188,43 @@ RAILS_MAX_THREADS=3
 
 Nếu không thiết lập `PORT`, `bin/dev` sẽ chạy mặc định trên `4000`. File `.env.sample` hiện đặt sẵn `PORT=4000`, nên nếu bạn copy nguyên file này thì local sẽ chạy tại `http://localhost:4000`. Toàn bộ danh sách biến môi trường — bao gồm secret cho production, cấu hình Puma, mailer, admin seed, CORS, và JWT token cho manual scripts — được mô tả trong `.env.sample`.
 
-Với browser client chạy khác origin, cấu hình CORS mặc định cho phép request từ `CORS_ALLOWED_ORIGINS` nhưng **không** expose response header `Authorization`. Nếu frontend cần đọc JWT từ response đăng nhập, hãy cập nhật `config/initializers/cors.rb` để expose header này một cách rõ ràng.
+Với browser client chạy khác origin, cấu hình CORS cho phép request từ `CORS_ALLOWED_ORIGINS` và expose response header JWT đã cấu hình (`expose: [JWT_AUTH_HEADER]` trong `config/initializers/cors.rb`), nên browser client có thể đọc JWT từ response đăng nhập.
+
+### JWT transport header
+
+Access JWT được trả về và chấp nhận qua một HTTP header có thể cấu hình. Giá trị mặc định giữ nguyên chuẩn thông thường:
+
+| Môi trường | `JWT_AUTH_HEADER` | Client header |
+|---|---|---|
+| Local / Docker | `Authorization` | `Authorization: Bearer <JWT>` |
+| Reverse proxy chuẩn | `Authorization` | `Authorization: Bearer <JWT>` |
+| Beam.cloud workaround | `X-Authorization` | `X-Authorization: Bearer <JWT>` |
+
+```env
+# Mặc định / nhà cung cấp hosting thông thường
+JWT_AUTH_HEADER=Authorization
+```
+
+Client:
+
+```http
+Authorization: Bearer <JWT>
+```
+
+Trong quá trình kiểm thử trên Beam Pod URL dùng cho dự án này, các request mang Rails JWT trong header `Authorization` chuẩn đã bị chặn trước khi tới Rails. Cấu hình Rails dùng `X-Authorization` để tránh xung đột header đó. Đây là workaround về vận chuyển cho riêng provider/deployment, không phải thay đổi mật mã JWT.
+
+```env
+# Beam.cloud workaround
+JWT_AUTH_HEADER=X-Authorization
+```
+
+Client:
+
+```http
+X-Authorization: Bearer <JWT>
+```
+
+JWT, secret ký và các claims hoàn toàn giống nhau trong cả hai chế độ; chỉ có HTTP header vận chuyển thay đổi. `JWT_AUTH_HEADER` được đọc bởi cả Devise JWT strategy (`config/initializers/devise.rb`) và CORS expose-header config, nên chỉ cần set ở một nơi. Header `Authorization` chuẩn vẫn là mặc định và được khuyến nghị khi nhà cung cấp hosting truyền header này nguyên vẹn.
 
 ## Code Coverage
 
@@ -323,13 +359,13 @@ curl -i -X POST http://localhost:4000/users/sign_in \
   }'
 ```
 
-JWT được trả về trong header `Authorization`.
+JWT được trả về trong header đã cấu hình (`JWT_AUTH_HEADER`, mặc định là `Authorization`).
 
 ### 4. Xem hồ sơ
 
 ```bash
 curl http://localhost:4000/user/profile \
-  -H "Authorization: Bearer <jwt_token>"
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer <jwt_token>"
 ```
 
 `/user/me` và `/user/whoami` là các alias tương thích cho cùng một response.
@@ -338,7 +374,7 @@ curl http://localhost:4000/user/profile \
 
 ```bash
 curl -X DELETE http://localhost:4000/users/sign_out \
-  -H "Authorization: Bearer <jwt_token>"
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer <jwt_token>"
 ```
 
 ## Tài liệu tham khảo thủ công

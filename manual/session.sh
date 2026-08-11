@@ -81,7 +81,7 @@ x-permitted-cross-domain-policies: none
 referrer-policy: strict-origin-when-cross-origin
 location: /
 content-type: application/json; charset=utf-8
-authorization: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}
+<configured-jwt-header>: Bearer <token>
 set-cookie: refresh_token=<your-refresh-token>; path=/; HttpOnly; SameSite=Lax
 etag: W/"f8df4ddaed8726a8beed27240b4408ca"
 cache-control: max-age=0, private, must-revalidate
@@ -124,7 +124,7 @@ api -X DELETE "$BASE_URL/users/sign_out" | jq .
 
 # ---- 5 - Sign Out: Invalid Token ----
 curl -s -X DELETE -H "Content-Type: application/json" \
-  -H "Authorization: Bearer test" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer test" \
   "$BASE_URL/users/sign_out" -i
 {"error":"Invalid token"}
 
@@ -205,7 +205,7 @@ api -X GET "$BASE_URL/user/whoami" | jq .
 
 # ---- 7 - Get Signed In User JSON Data: Invalid Token ----
 curl -s -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}" \
   "$BASE_URL/user/profile" | jq .
 {
   "error": "Invalid token"
@@ -213,7 +213,7 @@ curl -s -X GET -H "Content-Type: application/json" \
 
 # ---- 7 - Get Signed In User JSON Data: Expired Token ----
 curl -s -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer ${TEST_JWT_TOKEN:-<your-jwt-token-here>}" \
   "$BASE_URL/user/profile" | jq .
 {
   "user": null,
