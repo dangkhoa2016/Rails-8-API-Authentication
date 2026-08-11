@@ -7,7 +7,7 @@ Tài liệu này mô tả sự khác biệt về quyền truy cập giữa ba lo
 
 - **Role** được lưu trong cột `role` của bảng `users`, kiểu `string`, mặc định `"user"`.
 - Hai giá trị hợp lệ: `"user"` và `"admin"` (khai báo qua `enum :role` trong `User` model).
-- Xác thực dựa trên **JWT** (Devise + devise-jwt). Token được gửi trong header `Authorization: Bearer <token>`.
+- Xác thực dựa trên **JWT** (Devise + devise-jwt). Token được gửi trong header vận chuyển đã cấu hình (`JWT_AUTH_HEADER`, mặc định `Authorization`) dưới dạng `Bearer <token>`.
 - Email phải **đã được confirm** trước khi đăng nhập thành công.
 
 ---

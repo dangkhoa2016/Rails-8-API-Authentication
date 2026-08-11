@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../../lib/jwt_auth_header"
+
 # Validates environment configuration at boot time (production only).
 # Warnings appear in the application log immediately after startup, making
 # misconfiguration visible before the first real request is served.
@@ -32,6 +34,16 @@ if defined?(Devise) && Devise.mailer_sender.to_s.include?("example.com")
               "sent from this placeholder address. " \
               "Set the DEVISE_MAILER_SENDER environment variable to your real " \
               "sender address; no code change is required."
+end
+
+# JWT transport header
+# The access JWT normally travels in the standard `Authorization` header. A
+# provider that reserves that header (e.g. Beam.cloud) can move it to a custom
+# one via JWT_AUTH_HEADER. Log the effective header name (never the token) so
+# the transport is verifiable from the logs at boot.
+jwt_auth_header = JwtAuthHeader.name
+if jwt_auth_header != "Authorization"
+  Rails.logger.info "[EnvironmentCheck] JWT authentication header is set to #{jwt_auth_header}."
 end
 
 warnings.each do |msg|

@@ -254,6 +254,7 @@ deploy-time/container runtime knobs. Key variables for production:
 | `POSTGRES_PASSWORD`     | ✅           | —                               | Accessory superuser password (`.kamal/secrets`) |
 | `POSTGRES_STATEMENT_TIMEOUT` | Optional | `5000ms`                       | PostgreSQL `statement_timeout`            |
 | `DEVISE_JWT_SECRET_KEY` | Recommended | falls back to `secret_key_base` | Rotate independently from master key      |
+| `JWT_AUTH_HEADER`       | Optional    | `Authorization`                 | HTTP header transporting the access JWT (e.g. `X-Authorization` behind a gateway like Beam.cloud) |
 | `CORS_ALLOWED_ORIGINS`  | Recommended | `http://localhost:4000`         | Comma-separated browser origins allowed by Rack::Cors |
 | `DEVISE_MAILER_SENDER`  | Recommended | `noreply@example.com`           | Change to a real sender domain/address    |
 | `SOLID_QUEUE_IN_PUMA`   | Optional    | `true`                          | Set `false` if using separate job workers |
@@ -264,11 +265,10 @@ deploy-time/container runtime knobs. Key variables for production:
 Production boot also logs warnings if `DEVISE_JWT_SECRET_KEY` is missing or if
 `DEVISE_MAILER_SENDER` is still left at an example.com-style placeholder.
 
-If a browser client runs on a different origin and needs to read the
-`Authorization` response header from sign-in responses, update
-`config/initializers/cors.rb` to expose that header explicitly. The current CORS
-setup allows configured origins but does not expose custom response headers to
-cross-origin browser JavaScript.
+Browser clients running on a different origin can read the configured JWT
+transport header (`JWT_AUTH_HEADER`, default `Authorization`) from sign-in
+responses: `config/initializers/cors.rb` exposes it via `expose: [JWT_AUTH_HEADER]`
+and allows the standard, legacy Beam, and configured request headers.
 
 ---
 

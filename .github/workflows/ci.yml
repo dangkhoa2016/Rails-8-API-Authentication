@@ -149,6 +149,63 @@ jobs:
           path: public/coverage/
           retention-days: 14
 
+  # Verifies the same codebase boots and passes the full suite when the JWT
+  # travels in a custom header (Beam.cloud workaround). Rails initializers run
+  # once per process, so this must be a separate job (JWT_AUTH_HEADER is read
+  # at boot), not a runtime toggle.
+  test_custom_header:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rails_8_api_authentication_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d rails_8_api_authentication_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential \
+            git \
+            libpq-dev \
+            pkg-config
+
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Set RAILS_MASTER_KEY from GitHub Secrets
+        run: echo "RAILS_MASTER_KEY=${{ secrets.RAILS_MASTER_KEY }}" >> $GITHUB_ENV
+
+      - name: Prepare PostgreSQL and run tests with custom JWT header
+        env:
+          RAILS_ENV: test
+          JWT_AUTH_HEADER: X-Authorization
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_TEST_DB: rails_8_api_authentication_test
+          POSTGRES_STATEMENT_TIMEOUT: 5000ms
+        run: |
+          bin/rails db:prepare
+          bin/rails test
+
   schema_load:
     runs-on: ubuntu-latest
     services:

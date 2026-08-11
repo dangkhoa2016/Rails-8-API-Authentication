@@ -7,7 +7,7 @@ This document describes the differences in access rights among three types of us
 
 - **Role** is stored in the `role` column of the `users` table, type `string`, defaulting to `"user"`.
 - Two valid values: `"user"` and `"admin"` (declared via `enum :role` in the `User` model).
-- Authentication is based on **JWT** (Devise + devise-jwt). The token is sent in the header `Authorization: Bearer <token>`.
+- Authentication is based on **JWT** (Devise + devise-jwt). The token is sent in the configured transport header (`JWT_AUTH_HEADER`, default `Authorization`) as `Bearer <token>`.
 - Email must be **confirmed** before a successful login can occur.
 
 ---

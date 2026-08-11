@@ -16,11 +16,11 @@ Tài liệu này giải thích vòng đời đầy đủ của một JWT trong h
   → lưu token + payload vào user.token_info (attr_accessor, in-memory)
         │
         ▼
-  JWT trả về trong response header:  Authorization: Bearer <token>
+  JWT trả về trong response header: <JWT_AUTH_HEADER (mặc định: Authorization)>: Bearer <token>
         │
         ▼
   Client lưu token, gửi kèm mọi request tiếp theo:
-  Authorization: Bearer <token>
+  <JWT_AUTH_HEADER (mặc định: Authorization)>: Bearer <token>
         │
         ▼
   Warden::JWTAuth::Strategy.authenticate!
