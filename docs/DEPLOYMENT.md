@@ -381,7 +381,7 @@ This branch replaces the SQLite baseline with PostgreSQL going forward; it does
 **not** copy live SQLite rows. A real cutover requires row inventory,
 foreign-key ordering, sequence resets, counts/checksums, a rehearsal, a freeze
 window, and a rollback plan — all out of scope here. Treat the SQLite variant
-(recoverable at the `sqlite-baseline-v1` tag) as the pre-migration recovery
+(recoverable at the `baseline-sqlite-v1` tag) as the pre-migration recovery
 point, and only restore PostgreSQL backups into verified non-production targets.
 
 ---

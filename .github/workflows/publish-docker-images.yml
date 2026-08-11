@@ -9,7 +9,9 @@ on:
   # IMPORTANT:
   # docker-* only triggers this workflow.
   # The actual source code being built still comes from the fixed
-  # baseline refs configured in the matrix below.
+  # baseline refs configured in the matrix below. Baselines are
+  # maintained as branches (the living source line); the baseline tags
+  # record immutable release snapshots.
   push:
     tags:
       - "docker-*"
@@ -48,14 +50,14 @@ jobs:
 
       matrix:
         include:
-          - variant: postgres
-            ref: postgresql-baseline-v1
-            version: postgres-v1
+          - variant: postgresql
+            ref: baseline/postgresql-v1
+            version: postgresql-v1
             title: Rails 8 API Authentication - PostgreSQL
             description: Rails 8 API authentication service with Devise, JWT, and PostgreSQL support.
 
           - variant: sqlite
-            ref: sqlite-baseline-v1
+            ref: baseline/sqlite-v1
             version: sqlite-v1
             title: Rails 8 API Authentication - SQLite
             description: Rails 8 API authentication service with Devise, JWT, and SQLite support.
@@ -129,10 +131,10 @@ jobs:
 
           # Three aliases point to the same canonical multi-platform index:
           #
-          # postgres:
-          #   postgres
-          #   postgres-v1
-          #   postgres-<source-sha>
+          # postgresql:
+          #   postgresql
+          #   postgresql-v1
+          #   postgresql-<source-sha>
           #
           # sqlite:
           #   sqlite
@@ -199,7 +201,7 @@ jobs:
       #
       # IMPORTANT:
       # Use the immutable Buildx output digest instead of resolving the mutable
-      # :postgres / :sqlite tag again.
+      # :postgresql / :sqlite tag again.
       # -----------------------------------------------------------------------
 
       - name: Resolve platform manifest digests
@@ -318,10 +320,10 @@ jobs:
       #
       # Expected structure:
       #
-      # postgres-amd64
+      # postgresql-amd64
       #   └── linux/amd64
       #
-      # postgres-arm64
+      # postgresql-arm64
       #   └── linux/arm64
       #
       # sqlite-amd64
