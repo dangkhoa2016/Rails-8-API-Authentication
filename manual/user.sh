@@ -33,37 +33,37 @@ curl -X POST -H "Content-Type: application/json" -d '{
 
 # ---- 3 - Get /user/profile as role: user ----
 curl -s -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $USER_TOKEN" \
   "$BASE_URL/user/profile" | jq .
 
 # ---- 4 - Get /user/profile as role: admin ----
 curl -s -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $ADMIN_TOKEN" \
   "$BASE_URL/user/profile" | jq .
 
 # ---- 5 - Get /user/me as role: user ----
 curl -s -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $USER_TOKEN" \
   "$BASE_URL/user/me" | jq .
 
 # ---- 6 - Get /user/me as role: admin ----
 curl -s -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $ADMIN_TOKEN" \
   "$BASE_URL/user/me" | jq .
 
 # ---- 7 - Get /user/whoami as role: user ----
 curl -s -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $USER_TOKEN" \
   "$BASE_URL/user/whoami" | jq .
 
 # ---- 8 - Get /user/whoami as role: admin ----
 curl -s -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $ADMIN_TOKEN" \
   "$BASE_URL/user/whoami" | jq .
 
 # ---- 9 - try to access /users as role: user ----
 curl -s -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $USER_TOKEN" \
   "$BASE_URL/users" | jq .
 {
   "errors": "You must be an administrator to perform this action"
@@ -71,7 +71,7 @@ curl -s -X GET -H "Content-Type: application/json" \
 
 # ---- 10 - try to access /users as role: admin ----
 curl -s -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $ADMIN_TOKEN" \
   "$BASE_URL/users" | jq .
 {
   "users": [
@@ -110,7 +110,7 @@ curl -s -X GET -H "Content-Type: application/json" \
 
 # ---- 11 - try to access /users/1 as role: user ----
 curl -s -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $USER_TOKEN" \
   "$BASE_URL/users/1" | jq .
 {
   "errors": "You must be an administrator to perform this action"
@@ -118,7 +118,7 @@ curl -s -X GET -H "Content-Type: application/json" \
 
 # ---- 12 - try to access /users/1 as role: admin ----
 curl -s -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $ADMIN_TOKEN" \
   "$BASE_URL/users/1" | jq .
 {
   "id": 1,
@@ -135,7 +135,7 @@ curl -s -X GET -H "Content-Type: application/json" \
 
 # ---- 13 - Try to access /users/2 as role: user ----
 curl -s -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $USER_TOKEN" \
   "$BASE_URL/users/2" | jq .
 {
   "id": 2,
@@ -152,7 +152,7 @@ curl -s -X GET -H "Content-Type: application/json" \
 
 # ---- 14 - Try to access /users/2 as role: admin ----
 curl -s -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $ADMIN_TOKEN" \
   "$BASE_URL/users/2" | jq .
 {
   "id": 2,
@@ -169,7 +169,7 @@ curl -s -X GET -H "Content-Type: application/json" \
 
 # ---- 15 - Try to access /users/me as role: user ----
 curl -s -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $USER_TOKEN" \
   "$BASE_URL/users/me" | jq .
 {
   "error": "Route not found"
@@ -177,7 +177,7 @@ curl -s -X GET -H "Content-Type: application/json" \
 
 # ---- 16 - Try to access /users/me as role: admin ----
 curl -s -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $ADMIN_TOKEN" \
   "$BASE_URL/users/me" | jq .
 {
   "error": "Route not found"
@@ -185,7 +185,7 @@ curl -s -X GET -H "Content-Type: application/json" \
 
 # ---- 17 - Try to access /users/100 as role: user ----
 curl -s -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $USER_TOKEN" \
   "$BASE_URL/users/100" | jq .
 {
   "errors": "You must be an administrator to perform this action"
@@ -193,7 +193,7 @@ curl -s -X GET -H "Content-Type: application/json" \
 
 # ---- 18 - Try to access /users/100 as role: admin ----
 curl -s -X GET -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $ADMIN_TOKEN" \
   "$BASE_URL/users/100" | jq .
 {
   "errors": "User not found"
@@ -208,7 +208,7 @@ curl -s -X POST -H "Content-Type: application/json" -d '{
     "password_confirmation": "password"
   }
 }' "$BASE_URL/users/create" \
-  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $USER_TOKEN" \
   | jq .
 {
   "errors": "You must be an administrator to perform this action"
@@ -223,7 +223,7 @@ curl -s -X POST -H "Content-Type: application/json" -d '{
     "password_confirmation": "password"
   }
 }' "$BASE_URL/users/create" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $ADMIN_TOKEN" \
   | jq .
 {
   "id": 4,
@@ -246,7 +246,7 @@ curl -s -X PUT -H "Content-Type: application/json" -d '{
     "role": "admin"
   }
 }' "$BASE_URL/users/2" \
-  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $USER_TOKEN" \
   | jq .
 {
   "id": 2,
@@ -270,7 +270,7 @@ curl -s -X PUT -H "Content-Type: application/json" -d '{
     "role": "admin"
   }
 }' "$BASE_URL/users/2" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $ADMIN_TOKEN" \
   | jq .
 {
   "id": 2,
@@ -288,7 +288,7 @@ curl -s -X PUT -H "Content-Type: application/json" -d '{
 
 # ---- 23 - Try to delete user 2 as role: user ----
 curl -s -X DELETE -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $USER_TOKEN" \
   "$BASE_URL/users/2" | jq .
 {
   "message": "User [user@example.com] with id [2] has been deleted"
@@ -296,7 +296,7 @@ curl -s -X DELETE -H "Content-Type: application/json" \
 
 # ---- 24 - Try to delete user 2 as role: admin ----
 curl -s -X DELETE -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "${JWT_AUTH_HEADER:-Authorization}: Bearer $ADMIN_TOKEN" \
   "$BASE_URL/users/2" | jq .
 {
   "errors": "User not found"

@@ -110,6 +110,69 @@ jobs:
           path: public/coverage
           destination: coverage-report-ruby-<< parameters.ruby-version >>
 
+  # Boots Rails with JWT_AUTH_HEADER=X-Authorization (Beam.cloud workaround)
+  # and runs the full suite in a separate process. Initializers are evaluated
+  # once per process, so this is an independent job rather than a runtime toggle.
+  test_custom_header:
+    executor:
+      name: rails-env
+      ruby-version: "3.3"
+    environment:
+      JWT_AUTH_HEADER: X-Authorization
+    steps:
+      - checkout
+      - run:
+          name: "Install system dependencies"
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y libvips libpq-dev postgresql-client
+      - run:
+          name: "Wait for PostgreSQL"
+          command: |
+            for i in $(seq 1 30); do
+              if pg_isready -h 127.0.0.1 -p 5432 -U postgres >/dev/null; then
+                echo "PostgreSQL is ready"
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "PostgreSQL did not become ready in time" >&2
+            exit 1
+      - restore_cache:
+          keys:
+            - v1-gem-cache-3.3-{{ checksum "Gemfile" }}
+            - v1-gem-cache-3.3-
+      - run:
+          name: "Install Ruby dependencies"
+          command: |
+            gem install bundler
+            bundle config set --local path 'vendor/bundle'
+            bundle install
+      - save_cache:
+          paths:
+            - ./vendor/bundle
+          key: v1-gem-cache-3.3-{{ checksum "Gemfile" }}
+      - run:
+          name: "Database setup"
+          environment:
+            POSTGRES_HOST: 127.0.0.1
+            POSTGRES_PORT: 5432
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
+            POSTGRES_TEST_DB: rails_8_api_authentication_test
+            POSTGRES_STATEMENT_TIMEOUT: 5000ms
+          command: bin/rails db:prepare
+      - run:
+          name: "Run tests with custom JWT header"
+          environment:
+            POSTGRES_HOST: 127.0.0.1
+            POSTGRES_PORT: 5432
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
+            POSTGRES_TEST_DB: rails_8_api_authentication_test
+            POSTGRES_STATEMENT_TIMEOUT: 5000ms
+          command: bundle exec rails test
+
 # Define the workflow to orchestrate job execution
 workflows:
   version: 2
@@ -119,3 +182,4 @@ workflows:
           matrix:
             parameters:
               ruby-version: ["3.2", "3.3", "4.0"]
+      - test_custom_header
