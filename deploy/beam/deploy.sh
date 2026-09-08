@@ -117,8 +117,11 @@ required_secrets=(
   QUEUE_DATABASE_URL
   CABLE_DATABASE_URL
   SECRET_KEY_BASE
-  DEVISE_JWT_SECRET_KEY
   CORS_ALLOWED_ORIGINS
+)
+optional_secrets=(
+  DEVISE_JWT_SECRET_KEY
+  RAILS_MASTER_KEY
 )
 
 for secret_name in "${required_secrets[@]}"; do
@@ -126,6 +129,18 @@ for secret_name in "${required_secrets[@]}"; do
     die "missing required Beam secret: $secret_name"
   fi
 done
+
+optional_secrets_present=()
+for secret_name in "${optional_secrets[@]}"; do
+  if grep -Fxq "$secret_name" <<<"$secret_names"; then
+    optional_secrets_present+=("$secret_name")
+  fi
+done
+
+BEAM_OPTIONAL_SECRETS=""
+if (( ${#optional_secrets_present[@]} > 0 )); then
+  BEAM_OPTIONAL_SECRETS="$(IFS=,; printf '%s' "${optional_secrets_present[*]}")"
+fi
 
 if [[ -n "${SMOKE_EMAIL:-}" || -n "${SMOKE_PASSWORD:-}" ]]; then
   [[ -n "${SMOKE_EMAIL:-}" && -n "${SMOKE_PASSWORD:-}" ]] || die 'SMOKE_EMAIL and SMOKE_PASSWORD must be supplied together'
@@ -147,11 +162,16 @@ if [[ -n "$BEAM_CONTEXT" ]]; then
 else
   info 'Beam context: current default'
 fi
+if [[ -n "$BEAM_OPTIONAL_SECRETS" ]]; then
+  info "optional Beam secrets attached: $BEAM_OPTIONAL_SECRETS"
+else
+  info 'optional Beam secrets attached: none'
+fi
 pass 'Beam preflight checks completed'
 
 (
   cd "$SCRIPT_DIR"
-  beam deploy app.py:pod "${context_args[@]}"
+  BEAM_OPTIONAL_SECRETS="$BEAM_OPTIONAL_SECRETS" beam deploy app.py:pod "${context_args[@]}"
 )
 pass 'Beam deploy command completed for app.py:pod'
 
