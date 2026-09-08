@@ -80,6 +80,17 @@ else
   bad "repository policy resolves incremental and rewritten-history bases"
 fi
 
+RELEASE_PROCESS_EN="${SCRIPT_DIR}/../../docs/RELEASE_PROCESS.md"
+RELEASE_PROCESS_VI="${SCRIPT_DIR}/../../docs/RELEASE_PROCESS.vi.md"
+if grep -Fq 'Tag the exact post-merge `main` commit that passed mandatory post-merge CI.' "${RELEASE_PROCESS_EN}" &&
+   grep -Fq 'Never tag an earlier candidate, evidence-only commit, or pre-merge branch head for a new release.' "${RELEASE_PROCESS_EN}" &&
+   grep -Fq 'Tag exact post-merge `main` commit đã PASS mandatory post-merge CI.' "${RELEASE_PROCESS_VI}" &&
+   grep -Fq 'Không tag candidate cũ hơn, evidence-only commit hoặc pre-merge branch head cho release mới.' "${RELEASE_PROCESS_VI}"; then
+  ok "release policy tags the exact verified post-merge main commit"
+else
+  bad "release policy tags the exact verified post-merge main commit"
+fi
+
 SMOKE_SCRIPT="${SCRIPT_DIR}/smoke_deployment.sh"
 if [[ -x "${SMOKE_SCRIPT}" ]]; then
   if API_BASE_URL=https://example.test SMOKE_EMAIL=user@example.test "${SMOKE_SCRIPT}" --validate-only >/dev/null 2>&1; then
