@@ -38,3 +38,6 @@ test-reports
 
 # Ignore Gemfile.lock — each Ruby version generates its own
 Gemfile.lock
+
+# Internal agent planning artifacts are not public source.
+/docs/superpowers/

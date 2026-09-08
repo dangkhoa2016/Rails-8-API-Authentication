@@ -1,0 +1,11 @@
+.git
+.env
+.env.*
+*.key
+*.pem
+credentials/
+config/credentials/
+config/master.key
+__pycache__/
+*.pyc
+*.log
