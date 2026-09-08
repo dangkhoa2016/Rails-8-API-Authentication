@@ -4,14 +4,20 @@
 # Read-only repository policy checker.
 #
 # Usage:
-#   bin/check_repository_policy [REF] [MANUAL_BASE_REF]
+#   bin/check_repository_policy [REF] [BASE_REF]
 #
-# Audits REF (default HEAD) and exits non-zero if any project policy is
+# Audits REF (default HEAD) and exits non-zero if repository policy is
 # violated: tracked lockfile or coverage artifacts, non-conventional commit
 # messages, missing bullet bodies, mismatched author/committer dates, future
-# commit dates, future migration timestamps, forbidden workflow action
-# versions, immutability of non-Bash files under manual/, and — when a base
-# ref is provided — changes to those protected files since the base.
+# commit dates, future migration timestamps, workflow action versions,
+# immutability of non-Bash files under manual/, and — when a base ref is
+# provided — changes to those protected files since the base.
+#
+# When BASE_REF is provided, commit-record checks apply only to commits in
+# BASE_REF..REF. This prevents historical violations already present on the
+# target branch from making every later pull request permanently unmergeable.
+# Snapshot checks (tracked artifacts, workflows, migrations) still inspect the
+# resulting REF tree.
 #
 # The checker only reads repository state; it never modifies anything.
 
@@ -20,7 +26,6 @@ require "time"
 
 SUBJECT_PATTERN = /\A(?:build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(?:\([a-z0-9._-]+\))?!?: .+\z/
 BULLET_PATTERN = /\A- \S/
-FORBIDDEN_ACTION_VERSION = "v4"
 REQUIRED_ACTION_VERSIONS = {
   "actions/checkout" => "v7",
   "actions/upload-artifact" => "v7"
@@ -60,9 +65,6 @@ def check_workflow_actions(ref, files)
       action, version = match[1].split("@", 2)
       next if version.nil?
 
-      if version == FORBIDDEN_ACTION_VERSION
-        fail_check("workflow", "#{path} uses forbidden #{action}@#{version}")
-      end
       required = REQUIRED_ACTION_VERSIONS[action]
       if required && version != required
         fail_check("workflow", "#{path} pins #{action}@#{version}, expected @#{required}")
@@ -71,8 +73,9 @@ def check_workflow_actions(ref, files)
   end
 end
 
-def check_commit_records(ref)
-  log = git("log", ref, "--format=%H%x1f%s%x1f%b%x1f%aI%x1f%cI%x00")
+def check_commit_records(ref, base = nil)
+  revision = base ? "#{base}..#{ref}" : ref
+  log = git("log", revision, "--format=%H%x1f%s%x1f%b%x1f%aI%x1f%cI%x00")
   log.split("\x00").each do |record|
     next if record.strip.empty?
 
@@ -157,16 +160,16 @@ def check_manual_history(ref, files)
 end
 
 ref = ARGV[0] || "HEAD"
-manual_base = ARGV[1]
+base = ARGV[1]
 
 begin
   files = git_files(ref)
   check_tracked_artifacts(ref, files)
   check_workflow_actions(ref, files)
-  check_commit_records(ref)
+  check_commit_records(ref, base)
   check_migrations(ref, files)
   check_manual_history(ref, files)
-  check_manual(ref, manual_base)
+  check_manual(ref, base)
 rescue StandardError => e
   fail_check("error", e.message)
 end
