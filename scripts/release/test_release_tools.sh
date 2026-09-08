@@ -70,6 +70,14 @@ else
   bad "CI runs on push to main"
 fi
 
+if grep -Fq 'github.event.pull_request.base.sha' "${CI_FILE}" &&
+   grep -Fq 'github.event.before' "${CI_FILE}" &&
+   grep -Fq 'git rev-parse HEAD^' "${CI_FILE}"; then
+  ok "repository policy resolves an incremental base for PR, push, and manual CI"
+else
+  bad "repository policy resolves an incremental base for PR, push, and manual CI"
+fi
+
 SMOKE_SCRIPT="${SCRIPT_DIR}/smoke_deployment.sh"
 if [[ -x "${SMOKE_SCRIPT}" ]]; then
   if API_BASE_URL=https://example.test SMOKE_EMAIL=user@example.test "${SMOKE_SCRIPT}" --validate-only >/dev/null 2>&1; then
