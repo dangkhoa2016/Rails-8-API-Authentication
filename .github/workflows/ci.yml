@@ -3,6 +3,8 @@ name: CI
 on:
   workflow_dispatch:
   pull_request:
+  push:
+    branches: [main]
 
 jobs:
   scan_ruby:
@@ -149,10 +151,6 @@ jobs:
           path: public/coverage/
           retention-days: 14
 
-  # Verifies the same codebase boots and passes the full suite when the JWT
-  # travels in a custom header (Beam.cloud workaround). Rails initializers run
-  # once per process, so this must be a separate job (JWT_AUTH_HEADER is read
-  # at boot), not a runtime toggle.
   test_custom_header:
     runs-on: ubuntu-latest
 
@@ -259,3 +257,29 @@ jobs:
           bin/verify_test_database
           bin/rails db:schema:load
           bin/rails test test/lib/schema_contract_test.rb
+
+  release_contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Validate release tooling syntax
+        run: |
+          bash -n scripts/release/lib.sh
+          bash -n scripts/release/test_release_tools.sh
+          bash -n scripts/release/verify_repository.sh
+          bash -n scripts/release/verify_ghcr.sh
+          bash -n scripts/release/smoke_deployment.sh
+
+      - name: Test release tooling
+        run: bash scripts/release/test_release_tools.sh
+
+      - name: Verify repository release contract
+        run: bash scripts/release/verify_repository.sh
+
+      - name: Verify published GHCR baseline images
+        run: bash scripts/release/verify_ghcr.sh
