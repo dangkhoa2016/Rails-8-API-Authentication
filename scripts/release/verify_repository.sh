@@ -11,6 +11,8 @@ required=(
   deploy/beam/Dockerfile
   deploy/beam/app.py
   deploy/beam/entrypoint.sh
+  deploy/beam/deploy.sh
+  deploy/beam/test_deploy.sh
   deploy/beam/README.md
   deploy/beam/README.vi.md
   deploy/huggingface/Dockerfile
@@ -53,7 +55,10 @@ bash -n scripts/release/test_release_tools.sh
 bash -n scripts/release/verify_ghcr.sh
 bash -n scripts/release/smoke_deployment.sh
 bash -n deploy/beam/entrypoint.sh
+bash -n deploy/beam/deploy.sh
+bash -n deploy/beam/test_deploy.sh
 ruby -c deploy/beam/beam_logging.rb >/dev/null
 python -m py_compile deploy/beam/app.py
+bash deploy/beam/test_deploy.sh
 
 echo 'PASS repository release contract'
