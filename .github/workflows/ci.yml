@@ -249,13 +249,15 @@ jobs:
       - name: Verify schema loading
         env:
           RAILS_ENV: test
+          ALLOW_DATABASE_RESET: "1"
           POSTGRES_HOST: 127.0.0.1
           POSTGRES_PORT: 5432
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_TEST_DB: rails_8_api_authentication_schema_load_test
-          POSTGRES_STATEMENT_TIMEOUT: 5000ms
+          POSTGRES_TEST_DB: rails_8_api_authentication_schema_test
+          PGPASSWORD: postgres
         run: |
+          createdb -h 127.0.0.1 -U postgres rails_8_api_authentication_schema_test
           bin/verify_test_database
           bin/rails db:schema:load
           bin/rails test test/lib/schema_contract_test.rb
