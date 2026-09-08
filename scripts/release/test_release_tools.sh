@@ -80,6 +80,17 @@ else
   bad "repository policy resolves incremental and rewritten-history bases"
 fi
 
+RELEASE_PROCESS_EN="${SCRIPT_DIR}/../../docs/RELEASE_PROCESS.md"
+RELEASE_PROCESS_VI="${SCRIPT_DIR}/../../docs/RELEASE_PROCESS.vi.md"
+if grep -Fq 'Tag the exact post-merge `main` commit that passed mandatory post-merge CI.' "${RELEASE_PROCESS_EN}" &&
+   grep -Fq 'Never tag an earlier candidate, evidence-only commit, or pre-merge branch head for a stable release.' "${RELEASE_PROCESS_EN}" &&
+   grep -Fq 'Tag exact post-merge `main` commit đã PASS mandatory post-merge CI.' "${RELEASE_PROCESS_VI}" &&
+   grep -Fq 'Không tag candidate cũ hơn, evidence-only commit hoặc pre-merge branch head cho stable release.' "${RELEASE_PROCESS_VI}"; then
+  ok "release policy tags the exact verified post-merge main commit"
+else
+  bad "release policy tags the exact verified post-merge main commit"
+fi
+
 HF_DOCKERFILE="${SCRIPT_DIR}/../../deploy/huggingface/Dockerfile"
 HF_README_EN="${SCRIPT_DIR}/../../deploy/huggingface/README.md"
 HF_README_VI="${SCRIPT_DIR}/../../deploy/huggingface/README.vi.md"
