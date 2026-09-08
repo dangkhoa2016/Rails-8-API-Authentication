@@ -1,10 +1,10 @@
 # Release Process
 
-This document is the canonical release-engineering contract for the first semantic-versioned public release of Rails 8 API Authentication.
+This document is the canonical release-engineering contract for semantic-versioned public releases of Rails 8 API Authentication.
 
 ## Release model
 
-The first semantic-versioned public release is created directly as stable `v1.0.0`. There is no prerequisite public prerelease tag. The release-hardening branch is `release/v1.0.0` and is merged into `main` only after every mandatory gate passes.
+The first semantic-versioned public release is finalized directly as stable `v1.0.0`. There is no prerequisite public prerelease tag. Release-hardening reaches `main` only after the required review and qualification gates pass; explicitly authorized pre-public history curation may amend existing release commits before community publication.
 
 Release states are `NOT RUN`, `BLOCKED`, `FAIL`, and `PASS`. Only `PASS` satisfies a mandatory release gate. Missing or partial evidence is never promoted to PASS.
 
@@ -73,9 +73,9 @@ JWT_AUTH_HEADER=X-Authorization
 
 when the provider path intercepts the standard `Authorization` header. This changes JWT transport only; signing, claims, expiration, and application authorization semantics remain unchanged.
 
-Hugging Face Spaces uses the SQLite baseline for a self-contained demo recipe. Ephemeral or free hosting must not be described as HA, SLA-backed, or durable database hosting.
+Hugging Face Spaces uses the frozen PostgreSQL runtime for the canonical production-style demo. The SQLite baseline remains an immutable compatibility and historical reference. Ephemeral or free hosting must not be described as HA, SLA-backed, or durable database hosting.
 
-## Gate 5 — v1.0.0 readiness
+## Gate 5 — Release readiness
 
 Gate 5 is evaluated on one exact stable candidate commit and requires all of the following:
 
@@ -84,7 +84,7 @@ Gate 5 is evaluated on one exact stable candidate commit and requires all of the
 - `scripts/release/verify_ghcr.sh` PASS;
 - at least one real full deployment smoke PASS covering `/up`, `/users/sign_in`, and `/user/profile`;
 - repository controls reported active by GitHub;
-- `docs/releases/v1.0.0-acceptance.md` records observed values only;
+- the version-specific acceptance record under `docs/releases/` records observed values only;
 - no known release-blocking issue remains.
 
 Health-only validation is insufficient. Output that contains `NOT RUN authentication smoke` does not satisfy Gate 5.
@@ -110,22 +110,56 @@ The stable source candidate and the frozen runtime artifacts are separate eviden
 - A provider deployment may intentionally derive from a frozen baseline image when the documented recipe says so.
 - Acceptance must state the actual running image/source provenance and must never claim the provider container was built from the stable candidate SHA unless that was actually observed.
 
-## Creating `v1.0.0`
+## Pre-public finalization
 
-Create `v1.0.0` only after Gate 5 PASS and final review. Record the accepted implementation SHA and evidence in `docs/releases/v1.0.0-acceptance.md`.
+Before the first community publication of a stable version, maintainers may
+replace a staging tag or GitHub Release object as part of one controlled
+finalization sequence. This allowance exists only while the version has not
+been announced or distributed for community use; it is not permission to
+rewrite a release after users may rely on it.
 
-Use an annotated tag and never move it after publication. If source changes are required before publication, re-run the affected gates on the new exact candidate. If source changes are required after `v1.0.0` is published, create a subsequent semantic version instead of moving `v1.0.0`.
+For `v1.0.0`, pre-public finalization requires:
+
+- amend existing release-history commits rather than adding repair-only commits;
+- require mandatory push-to-`main` CI PASS on the exact final `main` SHA;
+- create or replace the annotated `v1.0.0` tag only after that PASS;
+- synchronize the tag message, GitHub Release notes, and any published release
+  assets with the same source SHA;
+- restore steady-state repository rules immediately after the authorized
+  history rewrite.
+
+Once a stable version is publicly announced or distributed, its tag is
+immutable. Any later source correction requires a subsequent semantic version.
+
+## Creating stable releases
+
+For `v1.0.0` final publication and every later stable release, publication uses the integrated, post-merge verified repository state as the release identity.
+
+Use an annotated tag and never move it after publication. If source changes are required before publication, re-run the affected gates. If source changes are required after a version is published, create a subsequent semantic version instead of moving the published tag.
+
+The release tag target must satisfy all of these conditions:
+
+- the target is the exact `main` commit produced by the reviewed release integration;
+- mandatory push-to-`main` CI has completed with PASS on that exact SHA;
+- the exact SHA contains the final version-specific acceptance record;
+- the exact SHA is still the current verified `main` release state immediately before tag creation.
+
+Tag the exact post-merge `main` commit that passed mandatory post-merge CI.
+Never tag an earlier candidate, evidence-only commit, or pre-merge branch head for a stable release.
 
 ## Merge and publication order
 
-1. Qualify the exact candidate on `release/v1.0.0`.
-2. Record acceptance evidence without changing application or release tooling.
-3. Re-verify the evidence-only branch head.
+1. Qualify the exact release candidate on its reviewed release branch.
+2. Record version-specific acceptance evidence without changing application semantics unless a new candidate is intentionally created.
+3. Re-verify the final branch head and all affected mandatory gates.
 4. Merge the reviewed release pull request into `main`.
-5. Verify the merged `main` lineage and frozen artifacts.
-6. Create annotated tag `v1.0.0` on the accepted implementation commit documented by the acceptance record.
-7. Publish a non-prerelease GitHub release.
-8. Run post-tag GHCR verification and a deployment health check.
+5. Wait for mandatory push-to-`main` CI and require PASS on the exact merge/integration SHA.
+6. Re-verify that this exact SHA is the intended current release state and that frozen artifacts and repository controls remain valid.
+7. Create the annotated semantic-version tag on that exact verified post-merge `main` SHA.
+8. Publish a non-prerelease GitHub release for that immutable tag.
+9. Run post-tag artifact verification and any publication-time deployment health checks required by the version's acceptance contract.
+
+Candidate CI remains evidence for the implementation lineage, but the release tag identifies the fully integrated repository state that users obtain when checking out the published version.
 
 ## Rollback
 

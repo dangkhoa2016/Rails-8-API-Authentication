@@ -73,7 +73,7 @@ JWT_AUTH_HEADER=X-Authorization
 
 khi provider path chặn header chuẩn `Authorization`. Việc này chỉ đổi JWT transport; signing, claims, expiration và application authorization semantics không đổi.
 
-Hugging Face Spaces dùng SQLite baseline cho self-contained demo. Hosting ephemeral/free không được mô tả là HA, có SLA hoặc durable database hosting.
+Hugging Face Spaces dùng frozen PostgreSQL runtime cho canonical production-style demo. SQLite baseline tiếp tục là immutable compatibility và historical reference. Hosting ephemeral/free không được mô tả là HA, có SLA hoặc durable database hosting.
 
 ## Gate 5 — v1.0.0 readiness
 
