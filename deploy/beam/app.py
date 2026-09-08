@@ -1,4 +1,33 @@
+import os
+
 from beam import Image, Pod
+
+REQUIRED_SECRETS = [
+    "DATABASE_URL",
+    "CACHE_DATABASE_URL",
+    "QUEUE_DATABASE_URL",
+    "CABLE_DATABASE_URL",
+    "SECRET_KEY_BASE",
+    "CORS_ALLOWED_ORIGINS",
+]
+OPTIONAL_SECRET_ALLOWLIST = ["DEVISE_JWT_SECRET_KEY", "RAILS_MASTER_KEY"]
+
+requested_optional_secrets = [
+    name.strip()
+    for name in os.environ.get("BEAM_OPTIONAL_SECRETS", "").split(",")
+    if name.strip()
+]
+unknown_optional_secrets = sorted(
+    set(requested_optional_secrets) - set(OPTIONAL_SECRET_ALLOWLIST)
+)
+if unknown_optional_secrets:
+    raise ValueError(
+        "Unsupported optional Beam secret(s): " + ", ".join(unknown_optional_secrets)
+    )
+
+secrets = REQUIRED_SECRETS + [
+    name for name in OPTIONAL_SECRET_ALLOWLIST if name in requested_optional_secrets
+]
 
 image = Image.from_dockerfile("./Dockerfile")
 
@@ -23,14 +52,6 @@ pod = Pod(
         "DB_PREPARE_MAX_ATTEMPTS": "3",
         "DB_PREPARE_RETRY_DELAY": "2",
     },
-    secrets=[
-        "DATABASE_URL",
-        "CACHE_DATABASE_URL",
-        "QUEUE_DATABASE_URL",
-        "CABLE_DATABASE_URL",
-        "SECRET_KEY_BASE",
-        "DEVISE_JWT_SECRET_KEY",
-        "CORS_ALLOWED_ORIGINS",
-    ],
+    secrets=secrets,
     keep_warm_seconds=300,
 )

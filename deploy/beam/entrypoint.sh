@@ -15,7 +15,6 @@ require_env CACHE_DATABASE_URL
 require_env QUEUE_DATABASE_URL
 require_env CABLE_DATABASE_URL
 require_env SECRET_KEY_BASE
-require_env DEVISE_JWT_SECRET_KEY
 require_env CORS_ALLOWED_ORIGINS
 
 cd /rails
