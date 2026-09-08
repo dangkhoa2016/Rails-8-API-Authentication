@@ -116,7 +116,7 @@ class CheckRepositoryPolicyTest < ActiveSupport::TestCase
     assert_match(/migration/i, out)
   end
 
-  test "rejects a v4 workflow action" do
+  test "rejects a v4 workflow action when that action requires v7" do
     commit(subject: "ci: bump actions", body: "- Move to v4\n", files: {
       ".github/workflows/ci.yml" => "jobs:\n  test:\n    steps:\n      - uses: actions/checkout@v4\n"
     })
@@ -124,7 +124,18 @@ class CheckRepositoryPolicyTest < ActiveSupport::TestCase
     out, _err, status = run_checker("HEAD")
 
     assert_not status.success?
-    assert_match(/@v4/, out)
+    assert_match(/actions\/checkout/, out)
+    assert_match(/expected @v7/, out)
+  end
+
+  test "allows v4 for workflow actions without an explicit required version" do
+    commit(subject: "ci: configure buildx", body: "- Use the supported Docker Buildx action\n", files: {
+      ".github/workflows/ci.yml" => "jobs:\n  test:\n    steps:\n      - uses: docker/setup-buildx-action@v4\n"
+    })
+
+    _out, _err, status = run_checker("HEAD")
+
+    assert status.success?
   end
 
   test "rejects a downgraded required action version" do
@@ -136,6 +147,16 @@ class CheckRepositoryPolicyTest < ActiveSupport::TestCase
 
     assert_not status.success?
     assert_match(/actions\/upload-artifact/, out)
+  end
+
+  test "ignores commit record violations that are at or before the supplied base" do
+    commit(subject: "legacy subject without convention", body: "legacy body without bullet")
+    base = head_sha
+    commit(subject: "docs: add release notes", body: "- Document the release candidate\n", files: { "release.md" => "release\n" })
+
+    _out, _err, status = run_checker("HEAD", base)
+
+    assert status.success?
   end
 
   test "rejects changes to protected manual files against a base ref" do
@@ -154,7 +175,7 @@ class CheckRepositoryPolicyTest < ActiveSupport::TestCase
     base = head_sha
     commit(subject: "feat: app change", body: "- Add app code\n", files: { "app/models/user.rb" => "class User\nend\n" })
 
-    _out, _err, status = run_checker("HEAD")
+    _out, _err, status = run_checker("HEAD", base)
 
     assert status.success?
   end
@@ -168,10 +189,10 @@ class CheckRepositoryPolicyTest < ActiveSupport::TestCase
       author_date: future
     )
 
-    _out, _err, status = run_checker("HEAD")
+    output, _err, status = run_checker("HEAD")
 
     assert_not status.success?
-    assert_match(/future/, _out)
+    assert_match(/future/, output)
   end
 
   test "rejects modification of a protected manual file" do
