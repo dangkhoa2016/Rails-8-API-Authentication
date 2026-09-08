@@ -65,13 +65,20 @@ jobs:
 
       - name: Check repository policy
         env:
-          BASE_REF: ${{ github.base_ref }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
         run: |
-          args=(HEAD)
-          if [[ -n "$BASE_REF" ]]; then
-            args+=("origin/$BASE_REF")
+          BASE_SHA="${PR_BASE_SHA:-${PUSH_BASE_SHA:-}}"
+          if [[ -z "$BASE_SHA" ]]; then
+            BASE_SHA="$(git rev-parse HEAD^)"
+          elif ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null || \
+               ! git merge-base --is-ancestor "$BASE_SHA" HEAD; then
+            # A force-push replaces history, so the event's previous SHA is
+            # not a valid incremental base. Keep snapshot checks, but do not
+            # re-audit every historical commit as if it were newly added.
+            BASE_SHA=HEAD
           fi
-          bin/check_repository_policy "${args[@]}"
+          bin/check_repository_policy HEAD "$BASE_SHA"
 
   test:
     runs-on: ubuntu-latest
@@ -147,7 +154,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: coverage-report-ruby-${{ matrix.ruby-version }}
+          name: coverage-ruby-${{ matrix.ruby-version }}
           path: public/coverage/
           retention-days: 14
 
@@ -168,6 +175,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
     steps:
       - name: Install packages
         run: |
@@ -193,19 +201,20 @@ jobs:
       - name: Prepare PostgreSQL and run tests with custom JWT header
         env:
           RAILS_ENV: test
-          JWT_AUTH_HEADER: X-Authorization
           POSTGRES_HOST: 127.0.0.1
           POSTGRES_PORT: 5432
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_TEST_DB: rails_8_api_authentication_test
           POSTGRES_STATEMENT_TIMEOUT: 5000ms
+          JWT_AUTH_HEADER: X-Authorization
         run: |
           bin/rails db:prepare
           bin/rails test
 
   schema_load:
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:17
@@ -220,6 +229,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
     steps:
       - name: Install packages
         run: |
@@ -245,15 +255,13 @@ jobs:
       - name: Verify schema loading
         env:
           RAILS_ENV: test
-          ALLOW_DATABASE_RESET: "1"
           POSTGRES_HOST: 127.0.0.1
           POSTGRES_PORT: 5432
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_TEST_DB: rails_8_api_authentication_schema_test
-          PGPASSWORD: postgres
+          POSTGRES_TEST_DB: rails_8_api_authentication_schema_load_test
+          POSTGRES_STATEMENT_TIMEOUT: 5000ms
         run: |
-          createdb -h 127.0.0.1 -U postgres rails_8_api_authentication_schema_test
           bin/verify_test_database
           bin/rails db:schema:load
           bin/rails test test/lib/schema_contract_test.rb
