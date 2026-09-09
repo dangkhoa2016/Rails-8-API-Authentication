@@ -40,6 +40,17 @@ class Rack::Attack
 
   # ── Throttles ──────────────────────────────────────────────────────────────
 
+  # Global emergency ceiling: 300 requests per 60 s per IP across ordinary
+  # application routes. /up remains safelisted above for health probes.
+  throttle("api/ip", limit: 300, period: 60) do |req|
+    req.ip unless req.path == "/up"
+  end
+
+  # Refresh-token rotation is unauthenticated and performs database work.
+  throttle("refresh_token/ip", limit: 20, period: 60) do |req|
+    req.ip if req.path == "/users/tokens/refresh" && req.post?
+  end
+
   # Sign-in: 5 attempts per 60 s per IP.
   # Defends against distributed brute-force campaigns.
   throttle("sign_in/ip", limit: 5, period: 60) do |req|
