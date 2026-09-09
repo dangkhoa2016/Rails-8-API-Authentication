@@ -42,32 +42,32 @@ Có thể dùng managed PostgreSQL hoặc một PostgreSQL service khác mà Mod
 
 ## 3. Tạo Modal runtime secret
 
-Tạo named secret một lần. Các giá trị bên dưới chỉ là placeholder; hãy lấy giá trị thật từ password manager hoặc deployment environment của bạn.
+Chuẩn bị một JSON file **nằm ngoài repository** (ví dụ trong thư mục deployment được password manager bảo vệ), mode `0600`, chứa năm key sau với giá trị thật:
+
+- `RAILS_MASTER_KEY`
+- `DATABASE_URL`
+- `CACHE_DATABASE_URL`
+- `QUEUE_DATABASE_URL`
+- `CABLE_DATABASE_URL`
+
+Sau đó tạo named Modal secret mà không ghi assignment giống secret vào tracked file hoặc shell history:
 
 ```bash
+chmod 600 "$HOME/.config/rails-api-production.json"
 modal secret create rails-api-production \
-  RAILS_MASTER_KEY='...' \
-  DATABASE_URL='postgresql://...' \
-  CACHE_DATABASE_URL='postgresql://...' \
-  QUEUE_DATABASE_URL='postgresql://...' \
-  CABLE_DATABASE_URL='postgresql://...'
+  --from-json "$HOME/.config/rails-api-production.json"
 ```
 
-Repository không đọc hoặc in các giá trị này trong lúc deploy. `app.py` yêu cầu năm key trên khi Modal resolve secret.
+Repository không đọc hoặc in các giá trị đó trong lúc deploy. `app.py` yêu cầu đủ năm key trên khi Modal resolve secret.
 
-`DEVISE_JWT_SECRET_KEY` là optional. Nếu key đã nằm trong Rails encrypted credentials thì không cần tạo thêm Modal environment variable. Nếu muốn rotate JWT key độc lập qua Modal, có thể thêm nó vào cùng secret:
+`DEVISE_JWT_SECRET_KEY` là optional. Nếu key đã nằm trong Rails encrypted credentials thì không cần thêm Modal environment variable. Nếu muốn rotate JWT key độc lập qua Modal, thêm key đó vào cùng JSON file ngoài repo rồi tạo lại secret:
 
 ```bash
 modal secret create --force rails-api-production \
-  RAILS_MASTER_KEY='...' \
-  DATABASE_URL='postgresql://...' \
-  CACHE_DATABASE_URL='postgresql://...' \
-  QUEUE_DATABASE_URL='postgresql://...' \
-  CABLE_DATABASE_URL='postgresql://...' \
-  DEVISE_JWT_SECRET_KEY='...'
+  --from-json "$HOME/.config/rails-api-production.json"
 ```
 
-Không ghi secret thật vào file trong repository.
+Không copy JSON file chứa secret vào repository.
 
 ## 4. Deploy
 
@@ -113,11 +113,9 @@ Chạy smoke test cơ bản không cần tài khoản:
 
 Lệnh này chứng minh `/up` là public; phần authentication/rate-limit sẽ báo `NOT RUN` nếu chưa cung cấp demo account.
 
-Để chạy acceptance smoke đầy đủ, truyền một demo account đang tồn tại qua environment:
+Để chạy acceptance smoke đầy đủ, hãy load demo account từ secure local environment rồi chạy:
 
 ```bash
-SMOKE_EMAIL='demo@example.com' \
-SMOKE_PASSWORD='...' \
 ./deploy/modal/smoke.sh https://<your-modal-url>
 ```
 
@@ -133,8 +131,6 @@ Full smoke yêu cầu tất cả điều kiện sau PASS:
 Smoke script không in password, JWT, refresh token, cookie hoặc Modal secret value.
 
 ## 6. Rate-limit profile
-
-Modal demo giữ các auth rule hiện tại và bổ sung hai abuse ceiling:
 
 | Rule | Giới hạn |
 |---|---:|
@@ -159,27 +155,10 @@ Black-box check này chứng minh spoof resistance; riêng nó chưa chứng min
 
 ## 8. Logs và vận hành
 
-Xem logs gần đây:
-
 ```bash
 modal app logs rails-8-api-authentication
-```
-
-Theo dõi logs realtime:
-
-```bash
 modal app logs rails-8-api-authentication -f
-```
-
-Liệt kê app:
-
-```bash
 modal app list --json
-```
-
-Dừng public demo và terminate container đang chạy:
-
-```bash
 modal app stop rails-8-api-authentication -y
 ```
 
@@ -192,8 +171,6 @@ Repository cố ý mặc định **public** Modal endpoint để người ngoài
 Modal proxy authentication có thể hữu ích cho private demo. Khi đó Modal credential là một ingress gate bổ sung. Rails JWT vẫn nên độc lập và tiếp tục đi qua `Authorization: Bearer <JWT>`. Public recipe trong thư mục này không bật Modal proxy auth và không dùng `Modal-Key` hoặc `Modal-Secret`.
 
 ## Giới hạn bảo mật và chi phí
-
-Defense-in-depth path là:
 
 ```text
 Internet
