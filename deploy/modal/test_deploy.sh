@@ -63,7 +63,7 @@ name, secret = records["secret"]
 assert name == "rails-api-production"
 assert secret["required_keys"] == [
     "RAILS_MASTER_KEY", "DATABASE_URL", "CACHE_DATABASE_URL",
-    "QUEUE_DATABASE_URL", "CABLE_DATABASE_URL",
+    "QUEUE_DATABASE_URL", "CABLE_DATABASE_URL", "CORS_ALLOWED_ORIGINS",
 ]
 assert "DEVISE_JWT_SECRET_KEY" not in secret["required_keys"]
 fn = records["function"]

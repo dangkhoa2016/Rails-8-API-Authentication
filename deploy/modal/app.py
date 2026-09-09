@@ -27,6 +27,7 @@ runtime_secret = modal.Secret.from_name(
         "CACHE_DATABASE_URL",
         "QUEUE_DATABASE_URL",
         "CABLE_DATABASE_URL",
+        "CORS_ALLOWED_ORIGINS",
     ],
 )
 
