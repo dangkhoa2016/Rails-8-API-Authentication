@@ -7,6 +7,7 @@ class RateLimitTest < ActionDispatch::IntegrationTest
   SIGN_IN_PATH = "/users/sign_in"
   REGISTRATION_PATH = "/users"
   PASSWORD_PATH = "/users/password"
+  REFRESH_PATH = "/users/tokens/refresh"
 
   setup do
     Rack::Attack.enabled = true
@@ -130,9 +131,44 @@ class RateLimitTest < ActionDispatch::IntegrationTest
     assert_equal "Too many requests. Please try again later.", json_response.fetch("error")
   end
 
+  test "refresh token allows up to 20 requests per IP per 60s then throttles" do
+    with_stable_throttle_window do
+      ip = "7.7.7.#{(rand * 200).to_i + 1}"
+
+      20.times do |i|
+        post REFRESH_PATH,
+          headers: JSON_HEADERS.merge("HTTP_X_REFRESH_TOKEN" => "invalid-#{i}"),
+          env: { "REMOTE_ADDR" => ip }
+        assert_not_equal 429, response.status,
+          "Expected request to pass but got 429 on attempt #{i + 1}"
+      end
+
+      post REFRESH_PATH,
+        headers: JSON_HEADERS.merge("HTTP_X_REFRESH_TOKEN" => "overflow"),
+        env: { "REMOTE_ADDR" => ip }
+      assert_response 429
+      assert response.headers.key?("Retry-After")
+    end
+  end
+
+  test "global API ceiling throttles request 301 per IP per 60s" do
+    with_stable_throttle_window do
+      ip = "8.8.8.#{(rand * 200).to_i + 1}"
+
+      300.times do |i|
+        get "/", env: { "REMOTE_ADDR" => ip }
+        assert_not_equal 429, response.status,
+          "Expected request to pass but got 429 on attempt #{i + 1}"
+      end
+
+      get "/", env: { "REMOTE_ADDR" => ip }
+      assert_response 429
+    end
+  end
+
   test "health check endpoint is never rate limited" do
     ip = "6.6.6.#{(rand * 200).to_i + 1}"
-    20.times do
+    305.times do
       get "/up", env: { "REMOTE_ADDR" => ip }
       assert_not_equal 429, response.status
     end
