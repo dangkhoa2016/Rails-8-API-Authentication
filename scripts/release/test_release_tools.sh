@@ -91,6 +91,20 @@ else
   bad "release policy tags the exact verified post-merge main commit"
 fi
 
+HF_DOCKERFILE="${SCRIPT_DIR}/../../deploy/huggingface/Dockerfile"
+HF_README_EN="${SCRIPT_DIR}/../../deploy/huggingface/README.md"
+HF_README_VI="${SCRIPT_DIR}/../../deploy/huggingface/README.vi.md"
+if grep -Fq 'ghcr.io/dangkhoa2016/rails-8-api-authentication:postgresql-6897c77' "${HF_DOCKERFILE}" &&
+   ! grep -Fq 'sqlite-1d842b1' "${HF_DOCKERFILE}" &&
+   grep -Fq 'PostgreSQL production-style demo' "${HF_README_EN}" &&
+   grep -Fq 'DATABASE_URL' "${HF_README_EN}" &&
+   grep -Fq 'PostgreSQL production-style demo' "${HF_README_VI}" &&
+   grep -Fq 'DATABASE_URL' "${HF_README_VI}"; then
+  ok "Hugging Face production demo uses canonical PostgreSQL runtime"
+else
+  bad "Hugging Face production demo uses canonical PostgreSQL runtime"
+fi
+
 SMOKE_SCRIPT="${SCRIPT_DIR}/smoke_deployment.sh"
 if [[ -x "${SMOKE_SCRIPT}" ]]; then
   if API_BASE_URL=https://example.test SMOKE_EMAIL=user@example.test "${SMOKE_SCRIPT}" --validate-only >/dev/null 2>&1; then

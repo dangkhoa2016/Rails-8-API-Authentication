@@ -1,14 +1,16 @@
-# Hugging Face Spaces SQLite deployment recipe
+# Hugging Face Spaces PostgreSQL deployment recipe
 
-This directory contains a sanitized Docker Space recipe for the immutable SQLite baseline:
+This directory contains a sanitized PostgreSQL production-style demo recipe for Hugging Face Docker Spaces. It uses the same immutable PostgreSQL runtime baseline as the Beam.cloud production-style demo:
 
 ```text
-ghcr.io/dangkhoa2016/rails-8-api-authentication:sqlite-1d842b1
+ghcr.io/dangkhoa2016/rails-8-api-authentication:postgresql-6897c77
 ```
 
-The baseline source commit is `1d842b18c1d1b07c027cbb7d49c19a52d16f98bc`.
+The baseline source commit is `6897c773ec1321401e52c21c63870a72d01ca349`.
 
-This target is a demo deployment. It is not HA, does not provide an SLA, and must not be presented as durable database hosting unless a storage volume has been explicitly attached and verified.
+This target is a production-style demo. It is not HA, does not provide an SLA, and is not a multi-tenant production service.
+
+The frozen SQLite baseline `1d842b18c1d1b07c027cbb7d49c19a52d16f98bc` remains immutable for compatibility, historical reference, and lightweight/disposable demo use. It is not the canonical Hugging Face production-demo runtime.
 
 ## Docker Space configuration
 
@@ -22,7 +24,7 @@ app_port: 7860
 ---
 ```
 
-Hugging Face currently documents port `7860` as the default Docker Space application port. Docker Space availability depends on the account/plan currently eligible for Docker Spaces.
+The wrapper exposes Rails through port `7860` and keeps the provider-neutral `Authorization` JWT transport header.
 
 Copy this directory's `Dockerfile` to the Docker Space repository root.
 
@@ -31,48 +33,50 @@ Copy this directory's `Dockerfile` to the Docker Space repository root.
 Configure these as Space secrets, never as committed values:
 
 ```text
+DATABASE_URL
+CACHE_DATABASE_URL
+QUEUE_DATABASE_URL
+CABLE_DATABASE_URL
 SECRET_KEY_BASE
-DEVISE_JWT_SECRET_KEY
+CORS_ALLOWED_ORIGINS
 ```
+
+The four database URLs must point to PostgreSQL databases appropriate for the primary application, Solid Cache, Solid Queue, and Solid Cable roles expected by the frozen PostgreSQL runtime.
+
+## Optional runtime secrets
+
+These are optional at the Hugging Face recipe layer:
+
+```text
+DEVISE_JWT_SECRET_KEY
+RAILS_MASTER_KEY
+```
+
+The application resolves the JWT signing secret through its configured credential/environment fallback chain, so `DEVISE_JWT_SECRET_KEY` must not be treated as mandatory by the Space recipe.
+
+`RAILS_MASTER_KEY` is required whenever the running Rails application needs to decrypt `config/credentials.yml.enc`. Never commit a Rails master key, database password, token, or decrypted credential payload to the Space repository.
 
 Recommended Space variables:
 
 ```text
-CORS_ALLOWED_ORIGINS=<actual Space origin>
 DEVISE_MAILER_SENDER=noreply@example.invalid
 RAILS_LOG_TO_STDOUT=true
 JWT_AUTH_HEADER=Authorization
 ```
 
-No Rails master key, `production.key`, database password, token, or other private credential belongs in the Space source repository.
+Set `CORS_ALLOWED_ORIGINS` to the actual Space origin through the required secret/environment configuration used for the deployment.
 
-## SQLite storage behavior
+## Startup contract
 
-The SQLite baseline stores its production databases at:
+The PostgreSQL baseline image provides `/rails/bin/docker-entrypoint`. The Hugging Face wrapper deliberately keeps the baseline server command shape:
 
 ```text
-/rails/storage/production.sqlite3
-/rails/storage/production_cache.sqlite3
-/rails/storage/production_queue.sqlite3
-/rails/storage/production_cable.sqlite3
+./bin/thrust ./bin/rails server
 ```
 
-### Ephemeral demo
+with `PORT=7860`.
 
-Without an attached writable volume, files written by the Docker Space are ephemeral and can be lost when the Space restarts, stops, or is rebuilt. This mode is appropriate only for disposable demo data.
-
-### Persistent demo with a Storage Bucket
-
-If persistence is required, attach a Hugging Face Storage Bucket as a **read-write volume mounted at `/rails/storage`**. This keeps the Rails baseline database paths unchanged. Verify the mounted volume in the Space runtime before treating the data as persistent.
-
-A representative CLI shape is:
-
-```bash
-hf spaces volumes set <owner>/<space> \
-  -v hf://buckets/<owner>/<bucket>:/rails/storage
-```
-
-Volume configuration is provider/account state and is not encoded in this repository. Storage Buckets may have separate billing/plan requirements.
+That command shape allows the inherited entrypoint to run `./bin/rails db:prepare` before starting the server. Do not append custom Rails server arguments that would bypass the entrypoint's server-command detection unless the startup contract is re-verified.
 
 ## Health and acceptance
 
