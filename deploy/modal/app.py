@@ -8,16 +8,18 @@ APP_NAME = "rails-8-api-authentication"
 SECRET_NAME = "rails-api-production"
 PORT = 4000
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-
-image = (
-    modal.Image.from_dockerfile(
-        REPO_ROOT / "Dockerfile",
-        context_dir=REPO_ROOT,
-        add_python="3.12",
+if modal.is_local():
+    REPO_ROOT = Path(__file__).resolve().parents[2]
+    image = (
+        modal.Image.from_dockerfile(
+            REPO_ROOT / "Dockerfile",
+            context_dir=REPO_ROOT,
+            add_python="3.12",
+        )
+        .entrypoint([])
     )
-    .entrypoint([])
-)
+else:
+    image = modal.Image.debian_slim()
 
 runtime_secret = modal.Secret.from_name(
     SECRET_NAME,

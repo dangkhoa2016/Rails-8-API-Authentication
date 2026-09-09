@@ -50,6 +50,7 @@ fake.Image = FakeImage
 fake.Secret = FakeSecret
 fake.App = FakeApp
 fake.web_server = web_server
+fake.is_local = lambda: True
 sys.modules["modal"] = fake
 
 spec = importlib.util.spec_from_file_location("modal_app_under_test", app_path)
@@ -58,6 +59,9 @@ spec.loader.exec_module(module)
 
 assert records["app_name"] == "rails-8-api-authentication"
 assert records["dockerfile"][1]["add_python"] == "3.12"
+expected_repo = app_path.parents[2]
+assert pathlib.Path(records["dockerfile"][0]) == expected_repo / "Dockerfile"
+assert pathlib.Path(records["dockerfile"][1]["context_dir"]) == expected_repo
 assert records["entrypoint"] == []
 name, secret = records["secret"]
 assert name == "rails-api-production"
@@ -82,6 +86,93 @@ assert "JWT_AUTH_HEADER" not in fn["env"]
 assert records["web_server"] == (4000, {"startup_timeout": 120, "requires_proxy_auth": False})
 PY
 ok 'app.py contract uses Rails production environment credentials'
+
+python3 - "$APP_SCRIPT" <<'PY'
+import importlib.util
+import pathlib
+import sys
+import types
+
+app_path = pathlib.Path(sys.argv[1])
+records = {"dockerfile_calls": [], "debian_slim_calls": 0}
+
+
+class FakeImage:
+    @classmethod
+    def from_dockerfile(cls, path, **kwargs):
+        records["dockerfile_calls"].append((str(path), kwargs))
+        return cls()
+
+    @classmethod
+    def debian_slim(cls):
+        records["debian_slim_calls"] += 1
+        return cls()
+
+    def entrypoint(self, commands):
+        records["entrypoint"] = commands
+        return self
+
+
+class FakeSecret:
+    @classmethod
+    def from_name(cls, name, **kwargs):
+        records["secret"] = (name, kwargs)
+        return ("secret", name)
+
+
+class FakeApp:
+    def __init__(self, name):
+        records["app_name"] = name
+
+    def function(self, **kwargs):
+        records["function"] = kwargs
+        return lambda fn: fn
+
+
+def web_server(port, **kwargs):
+    records["web_server"] = (port, kwargs)
+    return lambda fn: fn
+
+
+class RemotePathForbidden:
+    def __init__(self, *_args, **_kwargs):
+        raise AssertionError("remote import must not derive client-local REPO_ROOT")
+
+
+fake_modal = types.ModuleType("modal")
+fake_modal.Image = FakeImage
+fake_modal.Secret = FakeSecret
+fake_modal.App = FakeApp
+fake_modal.web_server = web_server
+fake_modal.is_local = lambda: False
+fake_pathlib = types.ModuleType("pathlib")
+fake_pathlib.Path = RemotePathForbidden
+
+saved_modal = sys.modules.get("modal")
+saved_pathlib = sys.modules.get("pathlib")
+try:
+    sys.modules["modal"] = fake_modal
+    sys.modules["pathlib"] = fake_pathlib
+    spec = importlib.util.spec_from_file_location("modal_app_remote_context", app_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+finally:
+    if saved_modal is None:
+        sys.modules.pop("modal", None)
+    else:
+        sys.modules["modal"] = saved_modal
+    if saved_pathlib is None:
+        sys.modules.pop("pathlib", None)
+    else:
+        sys.modules["pathlib"] = saved_pathlib
+
+assert records["dockerfile_calls"] == []
+assert records["debian_slim_calls"] == 1
+assert records["app_name"] == "rails-8-api-authentication"
+assert "function" in records
+assert records["web_server"] == (4000, {"startup_timeout": 120, "requires_proxy_auth": False})
+PY
+ok 'app.py remote import bypasses client-local image recipe'
 
 python3 - "$DOCKERFILE" <<'PY'
 from pathlib import Path
