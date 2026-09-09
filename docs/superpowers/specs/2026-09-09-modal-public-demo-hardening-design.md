@@ -91,23 +91,27 @@ The public endpoint intentionally does **not** use Modal proxy authentication be
 
 Use `@modal.web_server(...)` on a Modal Function. Current Modal documentation states that `web_server` exposes a full HTTP server and that `requires_proxy_auth=False` makes it public.
 
-The Function configuration is statically bounded for the demo profile:
+Freeze these demo-profile values in the initial recipe:
 
 - `min_containers=0`;
 - `max_containers=1`;
 - `buffer_containers=0`;
-- a short `scaledown_window` appropriate for an on-demand demo;
+- `scaledown_window=60` seconds;
+- `cpu=1.0`;
+- `memory=1024` MiB;
+- `RAILS_MAX_THREADS=3`;
+- one Puma process (`WEB_CONCURRENCY` unset or `1`);
 - CPU-only runtime;
 - no GPU;
-- one Puma process with a small thread pool.
+- `@modal.web_server(4000, startup_timeout=120, requires_proxy_auth=False)`.
 
-`max_containers=1` is a cost and database-pressure guardrail, not a DDoS guarantee.
+`max_containers=1` is a cost and database-pressure guardrail, not a DDoS guarantee. If the real smoke shows that 1024 MiB is insufficient, memory may be raised in a measured corrective change; it must not be silently changed without updating the documentation and evidence.
 
 ### 6.2 Image build
 
 Build the Modal image from the repository Dockerfile with `modal.Image.from_dockerfile(...)` so the deployed runtime corresponds to the exact source candidate being reviewed.
 
-Because Modal Functions require Python in the image, inject a supported Python runtime with `add_python` rather than maintaining a second Rails Dockerfile solely for Modal.
+Inject Python 3.12 with `add_python="3.12"` because Modal Functions require Python in the image. Do not maintain a second Rails Dockerfile solely for Modal.
 
 Clear the Docker image's normal ENTRYPOINT for the Modal Function runtime and explicitly launch Rails from the Python wrapper.
 
@@ -119,8 +123,9 @@ The Modal wrapper must:
 2. execute `bin/rails db:prepare` before accepting traffic;
 3. launch Puma/Rails on `0.0.0.0:4000`;
 4. use `RAILS_ENV=production`;
-5. preserve stdout/stderr for Modal logs;
-6. avoid a second reverse proxy inside the container unless later evidence shows it is necessary.
+5. set `RAILS_MAX_THREADS=3` for the demo profile;
+6. preserve stdout/stderr for Modal logs;
+7. avoid a second reverse proxy inside the container unless later evidence shows it is necessary.
 
 Modal already provides the external HTTPS ingress, so the initial recipe runs Puma directly instead of adding Thruster in front of Puma.
 
@@ -130,9 +135,9 @@ The repository contains only secret names and setup instructions, never secret v
 
 The Modal deployment uses one named Modal secret, documented as `rails-api-production`, containing the application's required production configuration.
 
-At minimum the runtime must resolve:
+The initial runtime requires:
 
-- `RAILS_MASTER_KEY` or an equivalent valid Rails credentials path;
+- `RAILS_MASTER_KEY`;
 - `DATABASE_URL`;
 - `CACHE_DATABASE_URL`;
 - `QUEUE_DATABASE_URL`;
