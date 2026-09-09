@@ -4,6 +4,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_SCRIPT="$SCRIPT_DIR/app.py"
 DEPLOY_SCRIPT="$SCRIPT_DIR/deploy.sh"
+DOCKERFILE="$SCRIPT_DIR/../../Dockerfile"
 
 pass=0
 fail=0
@@ -81,6 +82,42 @@ assert "JWT_AUTH_HEADER" not in fn["env"]
 assert records["web_server"] == (4000, {"startup_timeout": 120, "requires_proxy_auth": False})
 PY
 ok 'app.py contract uses Rails production environment credentials'
+
+python3 - "$DOCKERFILE" <<'PY'
+from pathlib import Path
+import re
+import shlex
+import sys
+
+dockerfile = Path(sys.argv[1])
+text = dockerfile.read_text(encoding="utf-8")
+
+# Collapse Dockerfile shell line continuations so the RUN block can be
+# inspected independently of formatting.
+logical = re.sub(r"\\\s*\n\s*", " ", text)
+
+match = re.search(
+    r"RUN\s+groupadd\b(?P<body>.*?chown\s+-R\s+rails:rails\s+db\s+log\s+storage\s+tmp)",
+    logical,
+    flags=re.S,
+)
+assert match, "runtime ownership RUN block not found"
+
+body = match.group("body")
+chown_marker = "chown -R rails:rails db log storage tmp"
+prefix = body.split(chown_marker, 1)[0]
+
+created = set()
+for mkdir in re.finditer(r"\bmkdir\s+-p\s+([^&;]+)", prefix):
+    created.update(shlex.split(mkdir.group(1).strip()))
+
+missing = {"log", "storage"} - created
+assert not missing, (
+    "Dockerfile must create runtime directories before chown; missing: "
+    + ", ".join(sorted(missing))
+)
+PY
+ok 'Dockerfile creates log/storage before runtime chown'
 
 make_fixture() {
   local root="$1"
