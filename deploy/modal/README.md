@@ -42,32 +42,32 @@ Use a managed PostgreSQL provider or another reachable PostgreSQL service. The U
 
 ## 3. Create the Modal runtime secret
 
-Create the named secret once. The values below are placeholders; use real values from your password manager or deployment environment.
+Prepare a JSON file **outside the repository** (for example in a password-manager-backed deployment directory), mode `0600`, containing these five keys with their real values:
+
+- `RAILS_MASTER_KEY`
+- `DATABASE_URL`
+- `CACHE_DATABASE_URL`
+- `QUEUE_DATABASE_URL`
+- `CABLE_DATABASE_URL`
+
+Then create the named Modal secret without putting secret-shaped assignments in tracked files or shell history:
 
 ```bash
+chmod 600 "$HOME/.config/rails-api-production.json"
 modal secret create rails-api-production \
-  RAILS_MASTER_KEY='...' \
-  DATABASE_URL='postgresql://...' \
-  CACHE_DATABASE_URL='postgresql://...' \
-  QUEUE_DATABASE_URL='postgresql://...' \
-  CABLE_DATABASE_URL='postgresql://...'
+  --from-json "$HOME/.config/rails-api-production.json"
 ```
 
 The repository never reads or prints those values during deployment. `app.py` requires the five keys above when Modal resolves the secret.
 
-`DEVISE_JWT_SECRET_KEY` is optional. If it is already stored in Rails encrypted credentials, no Modal environment variable is required. If you prefer independent JWT-key rotation through Modal, add it to the same secret:
+`DEVISE_JWT_SECRET_KEY` is optional. If it is already stored in Rails encrypted credentials, no Modal environment variable is required. If you prefer independent JWT-key rotation through Modal, add that key to the same out-of-band JSON file and recreate the secret:
 
 ```bash
 modal secret create --force rails-api-production \
-  RAILS_MASTER_KEY='...' \
-  DATABASE_URL='postgresql://...' \
-  CACHE_DATABASE_URL='postgresql://...' \
-  QUEUE_DATABASE_URL='postgresql://...' \
-  CABLE_DATABASE_URL='postgresql://...' \
-  DEVISE_JWT_SECRET_KEY='...'
+  --from-json "$HOME/.config/rails-api-production.json"
 ```
 
-Do not paste real secret values into repository files.
+Do not copy the JSON file into the repository.
 
 ## 4. Deploy
 
@@ -113,11 +113,9 @@ Run the repository smoke without account credentials:
 
 This proves public `/up`; authentication/rate-limit checks are reported as `NOT RUN` unless a demo account is supplied.
 
-For the complete acceptance smoke, provide an existing demo account through environment variables:
+For the complete acceptance smoke, provide an existing demo account through environment variables loaded from your local secure environment, then run:
 
 ```bash
-SMOKE_EMAIL='demo@example.com' \
-SMOKE_PASSWORD='...' \
 ./deploy/modal/smoke.sh https://<your-modal-url>
 ```
 
@@ -133,8 +131,6 @@ The complete smoke requires all of the following:
 The smoke script does not print passwords, JWTs, refresh tokens, cookies, or Modal secret values.
 
 ## 6. Rate-limit profile
-
-The Modal demo keeps the existing auth rules and adds two abuse ceilings:
 
 | Rule | Limit |
 |---|---:|
@@ -159,27 +155,10 @@ That black-box check proves spoof resistance; it does not by itself prove that e
 
 ## 8. Logs and operations
 
-Recent logs:
-
 ```bash
 modal app logs rails-8-api-authentication
-```
-
-Follow logs:
-
-```bash
 modal app logs rails-8-api-authentication -f
-```
-
-List applications:
-
-```bash
 modal app list --json
-```
-
-Stop the public demo and terminate its running containers:
-
-```bash
 modal app stop rails-8-api-authentication -y
 ```
 
@@ -192,8 +171,6 @@ This repository intentionally defaults to a **public** Modal endpoint so externa
 Modal proxy authentication can be useful for a private demo. In that mode, Modal credentials are an additional ingress gate. Keep Rails JWT transport separate: Rails should still receive its access token through `Authorization: Bearer <JWT>`. The public recipe in this directory does not enable Modal proxy auth and does not use `Modal-Key` or `Modal-Secret`.
 
 ## Security and cost limits
-
-The defense-in-depth path is:
 
 ```text
 Internet
