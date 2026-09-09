@@ -1,14 +1,16 @@
-# Recipe triển khai SQLite trên Hugging Face Spaces
+# Recipe triển khai PostgreSQL trên Hugging Face Spaces
 
-Thư mục này chứa Docker Space recipe đã sanitize cho immutable SQLite baseline:
+Thư mục này chứa PostgreSQL production-style demo recipe đã sanitize cho Hugging Face Docker Spaces. Recipe này dùng cùng immutable PostgreSQL runtime baseline với production-style demo trên Beam.cloud:
 
 ```text
-ghcr.io/dangkhoa2016/rails-8-api-authentication:sqlite-1d842b1
+ghcr.io/dangkhoa2016/rails-8-api-authentication:postgresql-6897c77
 ```
 
-Baseline source commit là `1d842b18c1d1b07c027cbb7d49c19a52d16f98bc`.
+Baseline source commit là `6897c773ec1321401e52c21c63870a72d01ca349`.
 
-Target này là demo deployment. Đây không phải HA, không cung cấp SLA và không được mô tả như database hosting bền vững trừ khi đã gắn storage volume rõ ràng và xác minh thành công.
+Target này là production-style demo. Đây không phải HA, không cung cấp SLA và không phải multi-tenant production service.
+
+Frozen SQLite baseline `1d842b18c1d1b07c027cbb7d49c19a52d16f98bc` vẫn được giữ bất biến để phục vụ compatibility, historical reference và lightweight/disposable demo. Nó không còn là canonical Hugging Face production-demo runtime.
 
 ## Cấu hình Docker Space
 
@@ -22,7 +24,7 @@ app_port: 7860
 ---
 ```
 
-Hugging Face hiện tài liệu hóa `7860` là application port mặc định cho Docker Space. Khả năng sử dụng Docker Spaces phụ thuộc plan/account hiện tại đủ điều kiện của Hugging Face.
+Wrapper expose Rails qua port `7860` và giữ provider-neutral JWT transport header là `Authorization`.
 
 Copy `Dockerfile` trong thư mục này vào root của Docker Space repository.
 
@@ -31,48 +33,50 @@ Copy `Dockerfile` trong thư mục này vào root của Docker Space repository.
 Cấu hình dưới dạng Space secrets, tuyệt đối không commit giá trị:
 
 ```text
+DATABASE_URL
+CACHE_DATABASE_URL
+QUEUE_DATABASE_URL
+CABLE_DATABASE_URL
 SECRET_KEY_BASE
-DEVISE_JWT_SECRET_KEY
+CORS_ALLOWED_ORIGINS
 ```
+
+Bốn database URL phải trỏ đến các PostgreSQL database phù hợp cho primary application, Solid Cache, Solid Queue và Solid Cable theo contract của frozen PostgreSQL runtime.
+
+## Runtime secret tùy chọn
+
+Các secret sau là optional ở Hugging Face recipe layer:
+
+```text
+DEVISE_JWT_SECRET_KEY
+RAILS_MASTER_KEY
+```
+
+Ứng dụng resolve JWT signing secret thông qua credential/environment fallback chain đã cấu hình, vì vậy `DEVISE_JWT_SECRET_KEY` không được coi là bắt buộc ở Space recipe.
+
+`RAILS_MASTER_KEY` là bắt buộc khi Rails runtime cần giải mã `config/credentials.yml.enc`. Tuyệt đối không commit Rails master key, database password, token hoặc decrypted credential payload vào Space repository.
 
 Space variables khuyến nghị:
 
 ```text
-CORS_ALLOWED_ORIGINS=<actual Space origin>
 DEVISE_MAILER_SENDER=noreply@example.invalid
 RAILS_LOG_TO_STDOUT=true
 JWT_AUTH_HEADER=Authorization
 ```
 
-Không đưa Rails master key, `production.key`, database password, token hoặc credential riêng tư khác vào source repository của Space.
+Thiết lập `CORS_ALLOWED_ORIGINS` thành origin thực tế của Space thông qua secret/environment configuration bắt buộc của deployment.
 
-## Hành vi lưu SQLite
+## Startup contract
 
-SQLite baseline lưu các production database tại:
+PostgreSQL baseline image cung cấp `/rails/bin/docker-entrypoint`. Hugging Face wrapper cố ý giữ command shape tương thích baseline:
 
 ```text
-/rails/storage/production.sqlite3
-/rails/storage/production_cache.sqlite3
-/rails/storage/production_queue.sqlite3
-/rails/storage/production_cable.sqlite3
+./bin/thrust ./bin/rails server
 ```
 
-### Ephemeral demo
+với `PORT=7860`.
 
-Nếu không gắn writable volume, file được ghi trong Docker Space là ephemeral và có thể mất khi Space restart, stop hoặc rebuild. Mode này chỉ phù hợp dữ liệu demo có thể bỏ.
-
-### Persistent demo với Storage Bucket
-
-Nếu cần persistence, gắn Hugging Face Storage Bucket dưới dạng **read-write volume tại `/rails/storage`**. Cách này giữ nguyên database path của Rails baseline. Phải xác minh volume thực tế trong Space runtime trước khi xem dữ liệu là persistent.
-
-Ví dụ dạng lệnh CLI:
-
-```bash
-hf spaces volumes set <owner>/<space> \
-  -v hf://buckets/<owner>/<bucket>:/rails/storage
-```
-
-Volume configuration là trạng thái của provider/account và không được hard-code trong repository này. Storage Buckets có thể có yêu cầu billing/plan riêng.
+Command shape này cho phép inherited entrypoint chạy `./bin/rails db:prepare` trước khi start server. Không thêm custom Rails server arguments làm entrypoint không còn nhận diện được server command, trừ khi startup contract đã được re-verify.
 
 ## Health và acceptance
 
