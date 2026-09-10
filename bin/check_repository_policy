@@ -19,6 +19,10 @@
 # Snapshot checks (tracked artifacts, workflows, migrations) still inspect the
 # resulting REF tree.
 #
+# GitHub-generated merge commits are exempt from subject/body formatting only.
+# Their dates are still validated, and non-merge commits in the same audited
+# range remain subject to the complete commit-message policy.
+#
 # The checker only reads repository state; it never modifies anything.
 
 require "open3"
@@ -73,6 +77,10 @@ def check_workflow_actions(ref, files)
   end
 end
 
+def merge_commit?(sha)
+  git("rev-list", "--parents", "-n", "1", sha).split.length > 2
+end
+
 def check_commit_records(ref, base = nil)
   revision = base ? "#{base}..#{ref}" : ref
   log = git("log", revision, "--format=%H%x1f%s%x1f%b%x1f%aI%x1f%cI%x00")
@@ -80,9 +88,11 @@ def check_commit_records(ref, base = nil)
     next if record.strip.empty?
 
     sha, subject, body, author_date, committer_date = record.split("\x1f", 5)
-    fail_check("subject", "#{sha} subject not conventional: #{subject.inspect}") unless subject.match?(SUBJECT_PATTERN)
-    unless body.to_s.lines.any? { |line| line.match?(BULLET_PATTERN) }
-      fail_check("body", "#{sha} body has no bullet line")
+    unless merge_commit?(sha)
+      fail_check("subject", "#{sha} subject not conventional: #{subject.inspect}") unless subject.match?(SUBJECT_PATTERN)
+      unless body.to_s.lines.any? { |line| line.match?(BULLET_PATTERN) }
+        fail_check("body", "#{sha} body has no bullet line")
+      end
     end
     if author_date != committer_date
       fail_check("dates", "#{sha} author date #{author_date} != committer date #{committer_date}")
