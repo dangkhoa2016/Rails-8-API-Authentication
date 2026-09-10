@@ -40,25 +40,30 @@ email = get_email
 password = get_password
 
 if email && password
-  user = User.find_or_create_by(
-    email: email,
-    username: 'admin',
-    first_name: 'Admin',
-    last_name: 'Master',
-    role: 'admin'
-  )
+  user = User.find_or_initialize_by(email: email)
 
-  user.password = password
-  user.confirm
-  user.save!
+  if user.new_record?
+    user.assign_attributes(
+      username: 'admin',
+      first_name: 'Admin',
+      last_name: 'Master',
+      role: 'admin'
+    )
 
-  if Rails.env.development?
-    puts "Admin user created at #{Time.now}."
-    puts "This is a development environment, so a random password was generated for the admin user:"
-    puts "  Email:    #{email}"
-    puts "  Password: #{password}"
+    user.password = password
+    user.confirm
+    user.save!
+
+    if Rails.env.development?
+      puts "Admin user created at #{Time.now}."
+      puts "This is a development environment, so a random password was generated for the admin user:"
+      puts "  Email:    #{email}"
+      puts "  Password: #{password}"
+    else
+      puts "Admin user created at #{Time.now} using provided credentials in environment variables or config/credentials.yml.enc."
+    end
   else
-    puts "Admin user created at #{Time.now} using provided credentials in environment variables or config/credentials.yml.enc."
+    puts "Admin user already exists; credentials left unchanged."
   end
 else
   puts %Q(
