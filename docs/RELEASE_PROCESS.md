@@ -75,6 +75,8 @@ when the provider path intercepts the standard `Authorization` header. This chan
 
 Hugging Face Spaces uses the frozen PostgreSQL runtime for the canonical production-style demo. The SQLite baseline remains an immutable compatibility and historical reference. Ephemeral or free hosting must not be described as HA, SLA-backed, or durable database hosting.
 
+Modal.com uses a bounded public production-style demo with standard `Authorization: Bearer <JWT>` transport, scale-to-zero behavior, CPU-only resources, and `max_containers=1`. This profile is not HA, SLA-backed, multi-tenant, or a claim of volumetric DDoS immunity.
+
 ## Gate 5 — Release readiness
 
 Gate 5 is evaluated on one exact stable candidate commit and requires all of the following:

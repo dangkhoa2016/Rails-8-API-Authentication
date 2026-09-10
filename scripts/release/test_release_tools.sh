@@ -104,6 +104,7 @@ if grep -Fq 'ghcr.io/dangkhoa2016/rails-8-api-authentication:postgresql-6897c77'
 else
   bad "Hugging Face production demo uses canonical PostgreSQL runtime"
 fi
+
 SMOKE_SCRIPT="${SCRIPT_DIR}/smoke_deployment.sh"
 if [[ -x "${SMOKE_SCRIPT}" ]]; then
   if API_BASE_URL=https://example.test SMOKE_EMAIL=user@example.test "${SMOKE_SCRIPT}" --validate-only >/dev/null 2>&1; then
