@@ -1,45 +1,62 @@
 # Rate Limiting
 > 🌐 Language / Ngôn ngữ: **English** | [Tiếng Việt](RATE_LIMITING.vi.md)
 
-This document describes the application's rate limiting mechanism, current thresholds, how to adjust them, and important notes when deploying behind a reverse proxy.
+This document describes the application's Rack::Attack policy, cache-store choices, current thresholds, and proxy/IP requirements.
 
 ## Overview
 
-Rate limiting is handled by the **rack-attack 6.8** gem — a Rack middleware that runs before Rails, checking and deciding whether a request is allowed to proceed before reaching the controller.
+Rate limiting is handled by **rack-attack 6.8**, mounted explicitly in this API-only Rails application. A matching request is rejected before controller logic with HTTP `429 Too Many Requests`.
 
-**Cache backend:**
-- **Test:** Dedicated `ActiveSupport::Cache::MemoryStore` (not using `null_store` in test env because it cannot count requests)
-- **Development:** `:memory_store` (counters reset when the app process restarts)
-- **Production:** `:solid_cache_store` backed by the dedicated PostgreSQL cache database (no Redis required)
+### Counter store
+
+`config/initializers/rack_attack.rb` resolves its store through `RackAttackCacheStore`:
+
+| `RACK_ATTACK_CACHE_STORE` | Behavior |
+|---|---|
+| unset / blank | use `Rails.cache` |
+| `rails` | use `Rails.cache` |
+| `memory` | use a process-local `ActiveSupport::Cache::MemoryStore` |
+| any other nonblank value | boot fails closed with `ArgumentError` |
+
+Tests always use MemoryStore so counters actually increment.
+
+Ordinary production uses `Rails.cache`, which is `:solid_cache_store` in this repository and therefore shared through the dedicated PostgreSQL cache database. The Modal public-demo recipe intentionally sets `RACK_ATTACK_CACHE_STORE=memory` because that profile freezes `max_containers=1`; this keeps rate-limit counter writes off PostgreSQL during an HTTP flood.
+
+**Do not use the memory mode for a multi-container deployment.** If the Modal container cap is raised, switch back to `RACK_ATTACK_CACHE_STORE=rails` or introduce another shared limiter store.
 
 ---
 
 ## Current Rate Limits
 
-| Rule | Endpoint | Method | Limit | Window | Key |
-|---|---|---|---|---|---|
-| `sign_in/ip` | `/users/sign_in` | POST | 5 requests | 60 seconds | IP address |
-| `sign_in/email` | `/users/sign_in` | POST | 10 requests | 60 seconds | Email in request body |
-| `registration/ip` | `/users` | POST | 10 requests | 1 hour | IP address |
-| `password_reset/ip` | `/users/password` | POST | 5 requests | 1 hour | IP address |
+| Rule | Endpoint / scope | Method | Limit | Window | Key |
+|---|---|---|---:|---:|---|
+| `api/ip` | all application paths except `/up` | all | 300 | 60 seconds | IP address |
+| `sign_in/ip` | `/users/sign_in` | POST | 5 | 60 seconds | IP address |
+| `sign_in/email` | `/users/sign_in` | POST | 10 | 60 seconds | email in JSON body |
+| `registration/ip` | `/users` | POST | 10 | 1 hour | IP address |
+| `password_reset/ip` | `/users/password` | POST | 5 | 1 hour | IP address |
+| `refresh_token/ip` | `/users/tokens/refresh` | POST | 20 | 60 seconds | IP address |
 
 Important behavior:
-- Rack::Attack runs before controller logic, so requests that later return `401` or `422` still increment counters.
-- In this repo only the auth endpoints above are throttled.
-- Localhost (`127.0.0.1`, `::1`) and `/up` are safelisted and will never trigger these limits.
 
-### Safelist (never throttled)
+- Rack::Attack runs before controller logic, so requests that later return `401` or `422` still increment matching counters.
+- The global `api/ip` ceiling prevents an attacker from avoiding endpoint-specific rules simply by spreading requests over many paths.
+- Refresh-token rotation is explicitly throttled because it is an unauthenticated path that performs token lookup/validation and may write rotation state.
+- `/up` is safelisted and excluded from the global ceiling.
+- Localhost (`127.0.0.1`, `::1`) is safelisted in development/test and only in production when `RACK_ATTACK_SAFELIST_LOCALHOST=true` is explicitly set.
+
+### Safelist
 
 | Rule | Condition |
 |---|---|
-| `allow health check` | Path is `/up` |
-| `allow localhost` | IP is `127.0.0.1` or `::1` |
+| `allow health check` | path is `/up` |
+| `allow localhost` | local IP in development/test, or explicit production opt-in |
 
 ---
 
 ## Throttled Response
 
-HTTP **429 Too Many Requests**, with a `Retry-After` header indicating the remaining seconds in the throttle window:
+A throttled request returns the application's normal JSON error contract:
 
 ```http
 HTTP/1.1 429 Too Many Requests
@@ -49,128 +66,101 @@ Retry-After: 60
 {"error":"Too many requests. Please try again later."}
 ```
 
-This response follows the application's global error contract: `{ "error": "..." }` (singular key).
+`Retry-After` comes from the matched Rack::Attack window.
 
 ---
 
-## Why There Are Two Rules for sign_in
+## Why Sign-In Has Two Rules
 
-| Rule                     | Protects Against                                                 |
-| ------------------------ | ---------------------------------------------------------------- |
-| `sign_in/ip` (5/60s)     | Brute force attacks from a single IP targeting multiple accounts |
-| `sign_in/email` (10/60s) | Credential stuffing targeting a single account from multiple IPs |
+| Rule | Protects against |
+|---|---|
+| `sign_in/ip` (5/60s) | brute-force attempts from one IP across accounts |
+| `sign_in/email` (10/60s) | credential stuffing aimed at one account from multiple IPs |
 
-The two rules operate independently. A request can trigger both at the same time if the same IP has reached 5 attempts **and** the email has been attempted 10 times.
-
-**Reading email from JSON body:**
+The email discriminator is read from the JSON body and the Rack input is rewound so Rails can still parse it:
 
 ```ruby
-body = req.env["rack.input"].read
-req.env["rack.input"].rewind      # rewind so body remains available for Rails
+body = req.env["rack.input"].read(4096) || ""
+req.env["rack.input"].rewind
 email = JSON.parse(body).dig("user", "email").to_s.downcase.presence
 ```
 
 ---
 
+## Tests
+
+Focused automated coverage:
+
+```bash
+bin/rails test test/lib/rack_attack_cache_store_test.rb \
+  test/integration/rate_limit_test.rb
+```
+
+The integration suite verifies existing auth thresholds, the global ceiling, the refresh-token ceiling, JSON `429` behavior, `Retry-After`, and that `/up` remains exempt beyond the global threshold.
+
+For the Modal public demo, offline configuration tests are separate:
+
+```bash
+bash deploy/modal/test_deploy.sh
+```
+
+A real Modal deployment also requires the black-box smoke:
+
+```bash
+SMOKE_EMAIL='demo@example.com' \
+SMOKE_PASSWORD='...' \
+./deploy/modal/smoke.sh https://<modal-public-url>
+```
+
+That smoke deliberately varies caller-supplied `X-Forwarded-For` values. If those values let the caller bypass `sign_in/ip`, Modal acceptance fails.
+
+---
+
+## Reverse Proxies and Client IPs
+
+IP throttling is only useful when the caller cannot choose the discriminator.
+
+Do **not** blindly trust `X-Forwarded-For`, and do not add broad proxy CIDRs by guesswork. Trust forwarding headers only when the ingress provider documents a trustworthy proxy boundary that you can configure precisely.
+
+A bad proxy configuration can fail in two opposite ways:
+
+1. every visitor appears to come from the same proxy address, causing legitimate users to share one counter;
+2. caller-controlled forwarding headers are trusted, allowing attackers to rotate fake IPs and evade limits.
+
+For Modal, this repository does not assume an undocumented client-IP header contract. The deployment smoke instead uses a black-box spoof-resistance check. Passing that check proves that caller-controlled changing `X-Forwarded-For` does not reset the sign-in/IP counter; it does **not** by itself prove perfect per-visitor IP attribution across different networks.
+
+For infrastructure you control (for example, your own reverse proxy or a documented CDN), configure Rails trusted proxies only from verified provider ranges/signals and test the resulting `request.remote_ip` / Rack discriminator behavior before production use.
+
+---
+
 ## Adjusting Limits
 
-All configuration is located in `config/initializers/rack_attack.rb`. Modify `limit:` and `period:` directly:
+All thresholds are defined in `config/initializers/rack_attack.rb`. If a limit or period changes, update `test/integration/rate_limit_test.rb` in the same change and re-run the focused suite.
 
-```ruby
-# Example: loosen sign_in to 10 attempts / 60s
-throttle("sign_in/ip", limit: 10, period: 60) do |req|
-  req.ip if req.path == "/users/sign_in" && req.post?
-end
-
-# Example: tighten registration to 3 attempts / 1 hour
-throttle("registration/ip", limit: 3, period: 3600) do |req|
-  req.ip if req.path == "/users" && req.post?
-end
-```
-
-After making changes, run tests to verify:
-
-```bash
-bin/rails test test/integration/rate_limit_test.rb
-```
-
-> If you change `limit:`, remember to update tests in `test/integration/rate_limit_test.rb` accordingly.
+The current values are intentionally conservative for an authentication API and a human-tested public demo. Tune them from observed legitimate traffic; do not loosen them merely to hide a proxy/IP configuration problem.
 
 ---
 
-## Manual Testing
-
-Plain `curl` loops against `localhost` will **not** trigger throttling in the default development setup because localhost is explicitly safelisted.
-
-Recommended options:
-
-1. Run `bin/rails test test/integration/rate_limit_test.rb`.
-2. Hit the app through a non-loopback hostname or deployed preview URL.
-3. Temporarily comment out the `allow localhost` safelist in `config/initializers/rack_attack.rb` while testing.
-
-Example after removing the localhost safelist, or when calling through a non-loopback host:
-
-```bash
-BASE_URL=http://localhost:4000 # use your actual local port, e.g. 4000 if copied .env.sample unchanged
-
-# Trigger sign_in/ip (6 attempts, the 6th should return 429)
-for i in $(seq 1 6); do
-  echo "--- Request $i ---"
-  curl -s -o /dev/null -w "%{http_code}" -X POST ${BASE_URL}/users/sign_in \
-    -H "Content-Type: application/json" \
-    -d '{"user":{"email":"test@example.com","password":"wrong"}}'
-  echo
-done
-```
-
-Expected output: `401 401 401 401 401 429`
-
----
-
-## Notes When Deploying Behind Reverse Proxy / Load Balancer
-
-**Problem:** `req.ip` in Rack::Attack defaults to reading `REMOTE_ADDR`. If the application is behind Nginx, Cloudflare, or a load balancer, `REMOTE_ADDR` will be the proxy’s IP — **all requests will share the same counter**, causing legitimate users to be incorrectly blocked.
-
-**Solution:** Configure Rails to trust `X-Forwarded-For` from trusted proxies:
+## Temporary Disable (debugging only)
 
 ```ruby
-# config/application.rb
-config.action_dispatch.trusted_proxies = [
-  ActionDispatch::RemoteIp::TRUSTED_PROXIES,
-  IPAddr.new("10.0.0.0/8"),     # internal load balancer IP range
-  IPAddr.new("203.0.113.1/32")  # specific IP of Nginx/Cloudflare
-]
-```
-
-After that, using `req.ip` in `rack_attack.rb` will automatically return the real client IP (extracted from `X-Forwarded-For`).
-
-> **Security warning:** Only trust `X-Forwarded-For` from proxies you control. Misconfiguration may allow attackers to spoof IPs by injecting this header.
-
----
-
-## Temporary Disable (for debugging only)
-
-```ruby
-# In Rails console on a running server
 Rack::Attack.enabled = false
-
-# Re-enable
+# ...debug...
 Rack::Attack.enabled = true
 ```
 
-Or in tests:
-
-```ruby
-setup { Rack::Attack.enabled = false }
-teardown { Rack::Attack.enabled = true }
-```
+Do not ship a public deployment with Rack::Attack disabled.
 
 ---
 
 ## Related Files
 
-| File                                  | Purpose                                                           |
-| ------------------------------------- | ----------------------------------------------------------------- |
-| `config/initializers/rack_attack.rb`  | All configuration: safelists, throttles, throttled_responder      |
-| `config/application.rb`               | `config.middleware.use Rack::Attack` — required for API-only apps |
-| `test/integration/rate_limit_test.rb` | 5 tests covering all throttle rules                               |
+| File | Purpose |
+|---|---|
+| `lib/rack_attack_cache_store.rb` | fail-closed Rack::Attack store selection |
+| `config/initializers/rack_attack.rb` | safelists, throttles, responder |
+| `config/application.rb` | mounts Rack::Attack in API-only middleware |
+| `test/lib/rack_attack_cache_store_test.rb` | cache-store policy tests |
+| `test/integration/rate_limit_test.rb` | throttle integration tests |
+| `deploy/modal/app.py` | one-container Modal memory-store invariant |
+| `deploy/modal/smoke.sh` | deployed spoof-resistance and throttle acceptance |
