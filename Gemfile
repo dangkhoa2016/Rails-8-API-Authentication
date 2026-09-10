@@ -8,7 +8,7 @@ gem "rails", "~> 8.1.3"
 # turn otherwise valid JSON request bodies into HTTP 400 responses. Upstream
 # Rails has a fix, but no released Rails version contains it yet. Remove this
 # pin after upgrading to a Rails release with JSON 3.0 compatibility.
-gem "json", "< 3.0"
+gem "json", "< 4.0"
 # Use PostgreSQL as the database for Active Record
 gem "pg", "~> 1.6"
 # Use the Puma web server [https://github.com/puma/puma]
