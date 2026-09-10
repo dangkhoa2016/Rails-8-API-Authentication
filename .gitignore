@@ -33,8 +33,9 @@ test-reports
 !/tmp/storage/
 !/tmp/storage/.keep
 
-# Ignore master key for decrypting credentials and more.
+# Ignore Rails credential decryption keys. Encrypted *.yml.enc files may be committed.
 /config/master.key
+/config/credentials/*.key
 
 # Ignore Gemfile.lock — each Ruby version generates its own
 Gemfile.lock
