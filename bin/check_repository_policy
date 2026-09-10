@@ -88,6 +88,7 @@ def check_commit_records(ref, base = nil)
     next if record.strip.empty?
 
     sha, subject, body, author_date, committer_date = record.split("\x1f", 5)
+    sha = sha.strip
     unless merge_commit?(sha)
       fail_check("subject", "#{sha} subject not conventional: #{subject.inspect}") unless subject.match?(SUBJECT_PATTERN)
       unless body.to_s.lines.any? { |line| line.match?(BULLET_PATTERN) }
