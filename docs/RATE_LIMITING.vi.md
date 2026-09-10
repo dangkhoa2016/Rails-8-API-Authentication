@@ -1,45 +1,62 @@
 # Kiểm soát Tần suất Truy cập
 > 🌐 Language / Ngôn ngữ: [English](RATE_LIMITING.md) | **Tiếng Việt**
 
-Tài liệu này mô tả cơ chế rate limiting của ứng dụng, các ngưỡng giới hạn hiện tại, cách điều chỉnh, và những lưu ý khi deploy sau reverse proxy.
+Tài liệu này mô tả policy Rack::Attack của ứng dụng, cách chọn cache store cho counter, các ngưỡng hiện tại và yêu cầu liên quan đến proxy/client IP.
 
 ## Tổng quan
 
-Rate limiting được xử lý bởi gem **rack-attack 6.8** — một Rack middleware chạy trước Rails, kiểm tra và quyết định có cho request đi tiếp hay không trước khi controller được gọi.
+Rate limiting được xử lý bởi **rack-attack 6.8**, được mount rõ ràng trong Rails API-only middleware. Request khớp throttle sẽ bị chặn trước controller với HTTP `429 Too Many Requests`.
 
-**Cache backend:**
-- **Test:** `ActiveSupport::Cache::MemoryStore` riêng (không dùng `null_store` của test env vì sẽ không đếm được)
-- **Development:** `:memory_store` (counter sẽ reset khi process app khởi động lại)
-- **Production:** `:solid_cache_store` dùng database PostgreSQL cache riêng (không cần Redis)
+### Store cho counter
+
+`config/initializers/rack_attack.rb` resolve store thông qua `RackAttackCacheStore`:
+
+| `RACK_ATTACK_CACHE_STORE` | Hành vi |
+|---|---|
+| unset / blank | dùng `Rails.cache` |
+| `rails` | dùng `Rails.cache` |
+| `memory` | dùng `ActiveSupport::Cache::MemoryStore` trong process |
+| giá trị nonblank khác | boot fail-closed với `ArgumentError` |
+
+Môi trường test luôn dùng MemoryStore để counter thật sự tăng.
+
+Production thông thường dùng `Rails.cache`; trong repo này đó là `:solid_cache_store`, chia sẻ qua PostgreSQL cache database riêng. Modal public-demo chủ ý đặt `RACK_ATTACK_CACHE_STORE=memory` vì profile đó khóa `max_containers=1`; nhờ vậy request flood không biến việc ghi counter thành hot path trên PostgreSQL.
+
+**Không dùng memory mode cho deployment nhiều container.** Nếu tăng container cap của Modal, hãy chuyển lại `RACK_ATTACK_CACHE_STORE=rails` hoặc thêm một shared limiter store khác.
 
 ---
 
-## Các ngưỡng giới hạn hiện tại
+## Các ngưỡng hiện tại
 
-| Rule | Endpoint | Method | Giới hạn | Cửa sổ | Key |
-|---|---|---|---|---|---|
-| `sign_in/ip` | `/users/sign_in` | POST | 5 request | 60 giây | IP address |
-| `sign_in/email` | `/users/sign_in` | POST | 10 request | 60 giây | Email trong body |
-| `registration/ip` | `/users` | POST | 10 request | 1 giờ | IP address |
-| `password_reset/ip` | `/users/password` | POST | 5 request | 1 giờ | IP address |
+| Rule | Endpoint / phạm vi | Method | Giới hạn | Cửa sổ | Key |
+|---|---|---|---:|---:|---|
+| `api/ip` | mọi application path trừ `/up` | tất cả | 300 | 60 giây | IP address |
+| `sign_in/ip` | `/users/sign_in` | POST | 5 | 60 giây | IP address |
+| `sign_in/email` | `/users/sign_in` | POST | 10 | 60 giây | email trong JSON body |
+| `registration/ip` | `/users` | POST | 10 | 1 giờ | IP address |
+| `password_reset/ip` | `/users/password` | POST | 5 | 1 giờ | IP address |
+| `refresh_token/ip` | `/users/tokens/refresh` | POST | 20 | 60 giây | IP address |
 
 Hành vi quan trọng:
-- Rack::Attack chạy trước controller, nên những request sau đó trả `401` hoặc `422` vẫn làm tăng counter.
-- Trong repo này chỉ các endpoint auth ở bảng trên bị throttle.
-- Localhost (`127.0.0.1`, `::1`) và `/up` được safelist nên sẽ không kích hoạt các giới hạn này.
 
-### Safelist (không bao giờ bị throttle)
+- Rack::Attack chạy trước controller, nên request sau đó trả `401` hoặc `422` vẫn tăng counter của rule phù hợp.
+- Global `api/ip` ceiling ngăn attacker né endpoint-specific rule chỉ bằng cách rải traffic qua nhiều path.
+- Refresh-token rotation bị throttle riêng vì đây là unauthenticated path có token lookup/validation và có thể ghi trạng thái rotation.
+- `/up` được safelist và loại khỏi global ceiling.
+- Localhost (`127.0.0.1`, `::1`) được safelist trong development/test; production chỉ safelist localhost khi chủ động đặt `RACK_ATTACK_SAFELIST_LOCALHOST=true`.
+
+### Safelist
 
 | Rule | Điều kiện |
 |---|---|
-| `allow health check` | Path là `/up` |
-| `allow localhost` | IP là `127.0.0.1` hoặc `::1` |
+| `allow health check` | path là `/up` |
+| `allow localhost` | local IP trong development/test, hoặc production opt-in rõ ràng |
 
 ---
 
 ## Response khi bị throttle
 
-HTTP **429 Too Many Requests**, header `Retry-After` chứa số giây còn lại của cửa sổ throttle:
+Request bị throttle trả error contract JSON hiện có của ứng dụng:
 
 ```http
 HTTP/1.1 429 Too Many Requests
@@ -49,121 +66,90 @@ Retry-After: 60
 {"error":"Too many requests. Please try again later."}
 ```
 
-Response này nhất quán với error contract của toàn ứng dụng: `{ "error": "..." }` (singular key).
+`Retry-After` lấy từ Rack::Attack window của rule được match.
 
 ---
 
-## Lý do có 2 rule cho sign_in
+## Vì sao Sign-In có hai rule
 
 | Rule | Phòng chống |
 |---|---|
-| `sign_in/ip` (5/60s) | Brute force từ một IP tấn công nhiều tài khoản khác nhau |
-| `sign_in/email` (10/60s) | Credential stuffing nhắm vào một tài khoản cụ thể từ nhiều IP khác nhau |
+| `sign_in/ip` (5/60s) | brute force từ một IP nhắm vào nhiều account |
+| `sign_in/email` (10/60s) | credential stuffing nhắm vào một account từ nhiều IP |
 
-Hai rule hoạt động độc lập. Một request có thể kích hoạt cả hai cùng lúc nếu cùng IP đã đạt 5 lần AND email đó đã bị thử 10 lần.
-
-**Cách đọc email từ JSON body:**
+Email discriminator được đọc từ JSON body rồi Rack input được rewind để Rails vẫn parse request bình thường:
 
 ```ruby
-body = req.env["rack.input"].read
-req.env["rack.input"].rewind      # rewind để body vẫn available cho Rails
+body = req.env["rack.input"].read(4096) || ""
+req.env["rack.input"].rewind
 email = JSON.parse(body).dig("user", "email").to_s.downcase.presence
 ```
 
 ---
 
+## Tests
+
+Focused automated coverage:
+
+```bash
+bin/rails test test/lib/rack_attack_cache_store_test.rb \
+  test/integration/rate_limit_test.rb
+```
+
+Integration suite kiểm tra các auth threshold cũ, global ceiling, refresh-token ceiling, JSON `429`, `Retry-After`, và chứng minh `/up` vẫn exempt kể cả vượt global threshold.
+
+Offline Modal configuration tests:
+
+```bash
+bash deploy/modal/test_deploy.sh
+```
+
+Real Modal deployment còn phải chạy black-box smoke:
+
+```bash
+SMOKE_EMAIL='demo@example.com' \
+SMOKE_PASSWORD='...' \
+./deploy/modal/smoke.sh https://<modal-public-url>
+```
+
+Smoke này cố ý thay đổi caller-supplied `X-Forwarded-For`. Nếu các giá trị đó giúp né `sign_in/ip`, Modal acceptance phải FAIL.
+
+---
+
+## Reverse Proxy và Client IP
+
+IP throttling chỉ hữu ích khi caller không thể tự chọn discriminator.
+
+**Không** tin tưởng mù quáng `X-Forwarded-For`, và không tự đoán rồi thêm các proxy CIDR quá rộng. Chỉ trust forwarding header khi ingress provider có contract rõ ràng về proxy boundary và bạn có thể cấu hình chính xác.
+
+Proxy config sai có thể hỏng theo hai hướng trái ngược:
+
+1. mọi visitor đều hiện thành cùng IP của proxy, khiến legitimate users chia sẻ một counter;
+2. caller-controlled forwarding header lại được trust, cho phép attacker đổi fake IP để né limit.
+
+Đối với Modal, repository không giả định một undocumented client-IP header contract. Deployment smoke dùng black-box spoof-resistance check. PASS chứng minh caller thay đổi `X-Forwarded-For` không reset được sign-in/IP counter; riêng điều đó **chưa** chứng minh Modal luôn gán public IP riêng biệt hoàn hảo cho từng visitor trên các network khác nhau.
+
+Với infrastructure do bạn kiểm soát (ví dụ reverse proxy riêng hoặc CDN có tài liệu rõ ràng), chỉ cấu hình Rails trusted proxies từ provider range/signal đã xác minh và test hành vi `request.remote_ip` / Rack discriminator trước production.
+
+---
+
 ## Điều chỉnh ngưỡng
 
-Tất cả config nằm trong `config/initializers/rack_attack.rb`. Thay đổi `limit:` và `period:` trực tiếp:
+Tất cả threshold nằm trong `config/initializers/rack_attack.rb`. Nếu thay `limit` hoặc `period`, cập nhật `test/integration/rate_limit_test.rb` trong cùng change và chạy lại focused suite.
 
-```ruby
-# Ví dụ: nới lỏng sign_in lên 10 lần / 60s
-throttle("sign_in/ip", limit: 10, period: 60) do |req|
-  req.ip if req.path == "/users/sign_in" && req.post?
-end
-
-# Ví dụ: thắt chặt registration xuống 3 lần / 1 giờ
-throttle("registration/ip", limit: 3, period: 3600) do |req|
-  req.ip if req.path == "/users" && req.post?
-end
-```
-
-Sau khi thay đổi, chạy lại tests để xác nhận:
-
-```bash
-bin/rails test test/integration/rate_limit_test.rb
-```
-
-> Nếu thay đổi `limit:`, nhớ cập nhật test trong `test/integration/rate_limit_test.rb` cho khớp.
+Các giá trị hiện tại cố ý tương đối bảo thủ cho authentication API và human-tested public demo. Hãy tune dựa trên legitimate traffic quan sát được; không nới limit chỉ để che một lỗi proxy/IP configuration.
 
 ---
 
-## Test thủ công
-
-Nếu chỉ chạy vòng lặp `curl` vào `localhost` trong môi trường development mặc định, bạn **sẽ không trigger được throttle** vì localhost đã được safelist rõ ràng.
-
-Các cách test phù hợp hơn:
-
-1. Chạy `bin/rails test test/integration/rate_limit_test.rb`.
-2. Gọi app qua hostname không phải loopback hoặc qua môi trường preview/deploy.
-3. Tạm comment safelist `allow localhost` trong `config/initializers/rack_attack.rb` khi cần debug.
-
-Ví dụ sau khi bỏ safelist localhost, hoặc khi gọi qua host không phải loopback:
-
-```bash
-BASE_URL=http://localhost:4000 # dùng port local thực tế của bạn, ví dụ 4000 nếu copy nguyên .env.sample
-
-# Trigger sign_in/ip (6 lần, lần 6 phải nhận 429)
-for i in $(seq 1 6); do
-  echo "--- Request $i ---"
-  curl -s -o /dev/null -w "%{http_code}" -X POST ${BASE_URL}/users/sign_in \
-    -H "Content-Type: application/json" \
-    -d '{"user":{"email":"test@example.com","password":"wrong"}}'
-  echo
-done
-```
-
-Expected output: `401 401 401 401 401 429`
-
----
-
-## Lưu ý khi deploy sau reverse proxy / load balancer
-
-**Vấn đề:** `req.ip` trong Rack::Attack mặc định đọc `REMOTE_ADDR`. Nếu ứng dụng đứng sau Nginx, Cloudflare, hay load balancer, `REMOTE_ADDR` sẽ là IP của proxy — **tất cả request sẽ dùng chung một counter** và legitimate users sẽ bị block oan.
-
-**Giải pháp:** Cấu hình Rails nhận `X-Forwarded-For` từ trusted proxies:
+## Disable tạm thời (chỉ debug)
 
 ```ruby
-# config/application.rb
-config.action_dispatch.trusted_proxies = [
-  ActionDispatch::RemoteIp::TRUSTED_PROXIES,
-  IPAddr.new("10.0.0.0/8"),     # IP range của load balancer nội bộ
-  IPAddr.new("203.0.113.1/32")  # IP cụ thể của Nginx/Cloudflare
-]
-```
-
-Sau đó trong `rack_attack.rb`, dùng `req.ip` sẽ tự động trả về IP thực của client (được extract từ `X-Forwarded-For`).
-
-> **Cảnh báo bảo mật:** Chỉ tin tưởng `X-Forwarded-For` từ các proxy bạn kiểm soát. Nếu cấu hình sai, attacker có thể giả mạo IP bằng cách tự thêm `X-Forwarded-For` header.
-
----
-
-## Disable tạm thời (chỉ dùng khi debug)
-
-```ruby
-# Trong Rails console trên server đang chạy
 Rack::Attack.enabled = false
-
-# Bật lại
+# ...debug...
 Rack::Attack.enabled = true
 ```
 
-Hoặc trong test:
-
-```ruby
-setup { Rack::Attack.enabled = false }
-teardown { Rack::Attack.enabled = true }
-```
+Không ship public deployment với Rack::Attack bị disable.
 
 ---
 
@@ -171,6 +157,10 @@ teardown { Rack::Attack.enabled = true }
 
 | File | Vai trò |
 |---|---|
-| `config/initializers/rack_attack.rb` | Toàn bộ config: safelists, throttles, throttled_responder |
-| `config/application.rb` | `config.middleware.use Rack::Attack` — bắt buộc cho API-only app |
-| `test/integration/rate_limit_test.rb` | 5 tests bao phủ tất cả throttle rules |
+| `lib/rack_attack_cache_store.rb` | fail-closed Rack::Attack store selection |
+| `config/initializers/rack_attack.rb` | safelist, throttle, responder |
+| `config/application.rb` | mount Rack::Attack trong API-only middleware |
+| `test/lib/rack_attack_cache_store_test.rb` | test cache-store policy |
+| `test/integration/rate_limit_test.rb` | throttle integration tests |
+| `deploy/modal/app.py` | invariant one-container + memory store của Modal |
+| `deploy/modal/smoke.sh` | deployed spoof-resistance và throttle acceptance |

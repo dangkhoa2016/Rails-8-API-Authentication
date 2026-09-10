@@ -1,17 +1,23 @@
 # frozen_string_literal: true
 
+require Rails.root.join("lib/rack_attack_cache_store")
+
 # Rack::Attack – rate limiting for auth endpoints.
 #
 # Limits are intentionally conservative. All throttles key on req.ip unless
 # noted; change to a trusted-proxy-aware IP extractor if the app is deployed
 # behind a load balancer that sets X-Forwarded-For.
 #
-# In test mode we swap in a MemoryStore so counters actually increment
-# (the test environment uses null_store by default, which discards writes).
+# Rack::Attack uses the Rails cache by default. Tests always use a MemoryStore
+# so counters actually increment; deployments may explicitly request the same
+# process-local store with RACK_ATTACK_CACHE_STORE=memory when their topology
+# guarantees a single application process/container.
 
-if Rails.env.test?
-  Rack::Attack.cache.store = ActiveSupport::Cache::MemoryStore.new
-end
+Rack::Attack.cache.store = RackAttackCacheStore.resolve(
+  environment: Rails.env.to_s,
+  requested: ENV["RACK_ATTACK_CACHE_STORE"],
+  default_store: Rails.cache
+)
 
 class Rack::Attack
   # ── Safelists ──────────────────────────────────────────────────────────────
@@ -33,6 +39,17 @@ class Rack::Attack
   end
 
   # ── Throttles ──────────────────────────────────────────────────────────────
+
+  # Global emergency ceiling: 300 requests per 60 s per IP across ordinary
+  # application routes. /up remains safelisted above for health probes.
+  throttle("api/ip", limit: 300, period: 60) do |req|
+    req.ip unless req.path == "/up"
+  end
+
+  # Refresh-token rotation is unauthenticated and performs database work.
+  throttle("refresh_token/ip", limit: 20, period: 60) do |req|
+    req.ip if req.path == "/users/tokens/refresh" && req.post?
+  end
 
   # Sign-in: 5 attempts per 60 s per IP.
   # Defends against distributed brute-force campaigns.
