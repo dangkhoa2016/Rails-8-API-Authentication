@@ -80,6 +80,7 @@ assert fn["scaledown_window"] == 60
 assert fn["env"] == {
     "RAILS_ENV": "production", "PORT": "4000",
     "RAILS_MAX_THREADS": "3", "RACK_ATTACK_CACHE_STORE": "memory",
+    "SOLID_QUEUE_IN_PUMA": "true", "JOB_CONCURRENCY": "1",
 }
 assert "MODAL_DEPLOYMENT" not in fn["env"]
 assert "JWT_AUTH_HEADER" not in fn["env"]

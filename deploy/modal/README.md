@@ -11,6 +11,7 @@ This recipe deploys the Rails API as a public production-style demo on Modal.com
 - `buffer_containers=0`, `scaledown_window=60`;
 - CPU-only, `cpu=1.0`, `memory=1024` MiB;
 - Rails/Puma on port `4000`, `RAILS_MAX_THREADS=3`;
+- `SOLID_QUEUE_IN_PUMA=true`, `JOB_CONCURRENCY=1` so the Solid Queue supervisor runs inside Puma while the demo container is awake;
 - `RACK_ATTACK_CACHE_STORE=memory`;
 - `RAILS_ENV=production`.
 
@@ -68,7 +69,7 @@ modal secret create rails-api-production \
 
 The preflight fails when `production.yml.enc` is missing, empty, untracked, or dirty; when `production.key` is tracked; when Modal authentication/secret lookup fails; or when the deployment files are dirty.
 
-Modal runs `db:prepare` and then the existing idempotent `db:seed` before Puma starts, ensuring the configured admin exists before demo login.
+Modal runs `db:prepare` and then the idempotent `db:seed` before Puma starts. The seed creates the configured admin only when it is missing; repeated cold starts leave an existing admin password and credentials unchanged.
 
 ## Public acceptance
 
@@ -78,6 +79,10 @@ curl -i https://<your-modal-url>/up
 ```
 
 Full smoke additionally checks Rails sign-in, standard bearer-token transport, profile access, X-Forwarded-For spoof resistance for the sign-in IP throttle, and refresh-token throttling.
+
+## Scale-to-zero queue semantics
+
+Because `min_containers=0`, Modal may stop the web container after the idle window. Solid Queue runs inside Puma while the container is awake, so the recurring `every hour` cleanup tasks are not a 24/7 scheduling guarantee for this demo profile. A deployment that requires strict wall-clock execution should use a separately scheduled worker/task rather than keeping this public demo warm.
 
 ## Cost and abuse posture
 

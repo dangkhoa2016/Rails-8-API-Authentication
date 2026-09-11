@@ -50,6 +50,8 @@ app = modal.App(APP_NAME)
         "PORT": str(PORT),
         "RAILS_MAX_THREADS": "3",
         "RACK_ATTACK_CACHE_STORE": "memory",
+        "SOLID_QUEUE_IN_PUMA": "true",
+        "JOB_CONCURRENCY": "1",
     },
 )
 @modal.web_server(PORT, startup_timeout=120, requires_proxy_auth=False)

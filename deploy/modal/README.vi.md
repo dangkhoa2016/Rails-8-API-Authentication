@@ -11,6 +11,7 @@ Recipe này deploy Rails API thành public production-style demo trên Modal.com
 - `buffer_containers=0`, `scaledown_window=60`;
 - CPU-only, `cpu=1.0`, `memory=1024` MiB;
 - Rails/Puma port `4000`, `RAILS_MAX_THREADS=3`;
+- `SOLID_QUEUE_IN_PUMA=true`, `JOB_CONCURRENCY=1` để Solid Queue supervisor chạy bên trong Puma khi demo container đang thức;
 - `RACK_ATTACK_CACHE_STORE=memory`;
 - `RAILS_ENV=production`.
 
@@ -68,7 +69,7 @@ modal secret create rails-api-production \
 
 Preflight fail nếu `production.yml.enc` bị thiếu, rỗng, chưa Git-track hoặc dirty; nếu `production.key` bị Git-track; nếu Modal authentication/secret lookup thất bại; hoặc deployment files đang dirty.
 
-Modal chạy `db:prepare` rồi `db:seed` trước Puma, nên admin cấu hình trong production credentials sẽ tồn tại trước khi login demo.
+Modal chạy `db:prepare` rồi `db:seed` idempotent trước Puma. Seed chỉ tạo admin cấu hình khi admin chưa tồn tại; các cold start lặp lại sẽ không ghi lại password hoặc credentials của admin hiện có.
 
 ## Public acceptance
 
@@ -78,6 +79,10 @@ curl -i https://<your-modal-url>/up
 ```
 
 Full smoke còn kiểm tra sign-in, bearer token chuẩn, profile access, khả năng chống bypass sign-in IP throttle bằng caller-controlled X-Forwarded-For và refresh-token throttling.
+
+## Ngữ nghĩa queue khi scale-to-zero
+
+Vì `min_containers=0`, Modal có thể dừng web container sau khoảng thời gian idle. Solid Queue chạy bên trong Puma khi container đang thức, nên hai cleanup task `every hour` không phải cam kết chạy đúng mỗi giờ 24/7 cho demo profile này. Nếu cần thực thi đúng theo wall clock, hãy dùng worker/task được schedule riêng thay vì giữ public demo luôn warm.
 
 ## Cost và abuse posture
 
