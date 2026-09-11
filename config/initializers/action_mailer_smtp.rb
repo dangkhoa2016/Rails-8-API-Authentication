@@ -23,6 +23,13 @@ if ENV["SMTP_ADDRESS"].present?
   settings[:domain] = ENV["SMTP_DOMAIN"] if ENV["SMTP_DOMAIN"].present?
   settings[:authentication] = ENV.fetch("SMTP_AUTHENTICATION").to_sym if ENV["SMTP_AUTHENTICATION"].present?
 
+  truthy = ->(value) { %w[1 true yes on].include?(value.to_s.strip.downcase) }
+  settings[:ssl] = truthy.call(ENV["SMTP_SSL"]) if ENV["SMTP_SSL"].present?
+  if ENV["SMTP_ENABLE_STARTTLS_AUTO"].present?
+    settings[:enable_starttls_auto] = truthy.call(ENV["SMTP_ENABLE_STARTTLS_AUTO"])
+  end
+
+  ActionMailer::Base.delivery_method = :smtp
   ActionMailer::Base.smtp_settings = settings
   ActionMailer::Base.raise_delivery_errors = true
 end

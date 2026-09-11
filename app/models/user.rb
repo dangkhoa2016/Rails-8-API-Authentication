@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "net/smtp"
+require Rails.root.join("lib/public_demo_email_policy")
 
 class User < ApplicationRecord
   # Include default devise modules. Others available are:
@@ -10,6 +11,8 @@ class User < ApplicationRecord
          :confirmable, :lockable, :trackable,
          :rememberable, :validatable, :recoverable,
          :jwt_authenticatable, jwt_revocation_strategy: JwtDenylist
+
+  validate :public_demo_email_domain_allowed, if: :public_demo_email_domain_validation_required?
 
   validates :password, format: {
     with: /\A(?=.*[a-z])(?=.*[A-Z])(?=.*\d).*\z/,
@@ -64,6 +67,11 @@ class User < ApplicationRecord
   ].freeze
 
   def send_devise_notification(notification, *args)
+    if PublicDemoEmailPolicy.enabled? && !PublicDemoEmailPolicy.allowed?(email)
+      Rails.logger.warn "Blocked #{notification} for unsupported public-demo email domain: #{email}"
+      return false
+    end
+
     devise_mailer.send(notification, self, *args).deliver_now
   rescue *SMTP_OFFLINE_ERRORS => e
     Rails.logger.error "Failed to send #{notification} to #{email}: #{e.class}"
@@ -95,6 +103,22 @@ class User < ApplicationRecord
   ].freeze
 
   private
+
+  def public_demo_email_domain_validation_required?
+    PublicDemoEmailPolicy.enabled? && email.present? && will_save_change_to_email?
+  end
+
+  def public_demo_email_domain_allowed
+    return if PublicDemoEmailPolicy.allowed?(email)
+
+    errors.add(
+      :email,
+      I18n.t(
+        "user.unsupported_public_demo_email_domain",
+        providers: PublicDemoEmailPolicy.allowed_domains_label
+      )
+    )
+  end
 
   def normalize_username
     self.username = username.to_s.strip.parameterize.underscore.downcase.presence
