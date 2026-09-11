@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require Rails.root.join("lib/rack_attack_cache_store")
+require Rails.root.join("lib/public_demo_email_policy")
 
 # Rack::Attack – rate limiting for auth endpoints.
 #
@@ -20,6 +21,30 @@ Rack::Attack.cache.store = RackAttackCacheStore.resolve(
 )
 
 class Rack::Attack
+  PUBLIC_DEMO_EMAIL_PATHS = %w[
+    /users
+    /users/password
+    /users/confirmation
+    /users/unlock
+  ].freeze
+
+  def self.public_demo_email_request?(req)
+    return false unless PublicDemoEmailPolicy.enabled?
+    return false unless req.post?
+
+    PUBLIC_DEMO_EMAIL_PATHS.include?(req.path)
+  end
+
+  def self.public_demo_request_email(req)
+    return unless public_demo_email_request?(req)
+
+    body = req.env["rack.input"].read(4096) || ""
+    req.env["rack.input"].rewind
+    JSON.parse(body).dig("user", "email").to_s.strip.downcase.presence
+  rescue JSON::ParserError
+    nil
+  end
+
   # ── Safelists ──────────────────────────────────────────────────────────────
 
   # Never throttle the health check endpoint.
@@ -73,6 +98,21 @@ class Rack::Attack
       end
       email
     end
+  end
+
+  # Public-demo email safety guard. These throttles are dormant unless
+  # PUBLIC_DEMO_EMAIL_GUARD=true. They intentionally fail closed to protect
+  # outbound-email reputation on an internet-facing demo.
+  throttle("public_demo_email/ip", limit: 5, period: 3600) do |req|
+    req.ip if Rack::Attack.public_demo_email_request?(req)
+  end
+
+  throttle("public_demo_email/recipient", limit: 3, period: 3600) do |req|
+    Rack::Attack.public_demo_request_email(req)
+  end
+
+  throttle("public_demo_email/global", limit: 50, period: 86_400) do |req|
+    "public-demo-email" if Rack::Attack.public_demo_email_request?(req)
   end
 
   # Registration: 10 sign-ups per hour per IP.

@@ -64,3 +64,4 @@ en:
     current_password_incorrect: Current password is incorrect
     active_must_be_boolean: active must be a boolean
     confirmation_email_failed: "Could not send confirmation email. Please try again later."
+    unsupported_public_demo_email_domain: "must use a supported public-demo provider (%{providers})"
