@@ -75,6 +75,8 @@ khi provider path chặn header chuẩn `Authorization`. Việc này chỉ đổ
 
 Hugging Face Spaces dùng frozen PostgreSQL runtime cho canonical production-style demo. SQLite baseline tiếp tục là immutable compatibility và historical reference. Hosting ephemeral/free không được mô tả là HA, có SLA hoặc durable database hosting.
 
+Modal.com dùng public production-style demo có giới hạn với transport `Authorization: Bearer <JWT>` chuẩn, scale-to-zero, CPU-only và `max_containers=1`. Profile này không phải HA, không có SLA, không phải multi-tenant và không phải tuyên bố miễn nhiễm volumetric DDoS.
+
 ## Gate 5 — Release readiness
 
 Gate 5 được đánh giá trên một exact stable candidate commit và yêu cầu toàn bộ:

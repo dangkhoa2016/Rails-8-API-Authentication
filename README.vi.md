@@ -2,27 +2,34 @@
 
 [![Ruby 3.x](https://img.shields.io/badge/Ruby-3.x-red?style=flat&logo=ruby&logoColor=white)](https://www.ruby-lang.org/)
 [![Ruby 4.x](https://img.shields.io/badge/Ruby-4.x-red?style=flat&logo=ruby&logoColor=white)](https://www.ruby-lang.org/)
-[![Rails 8.1.3](https://img.shields.io/badge/Rails-8.1.3-CC0000?logo=rubyonrails&logoColor=white)](https://rubyonrails.org/)
+[![Rails 8.1](https://img.shields.io/badge/Rails-8.1-CC0000?logo=rubyonrails&logoColor=white)](https://rubyonrails.org/)
 [![CI](https://github.com/dangkhoa2016/Rails-8-API-Authentication/actions/workflows/ci.yml/badge.svg)](https://github.com/dangkhoa2016/Rails-8-API-Authentication/actions/workflows/ci.yml)
 [![CircleCI](https://dl.circleci.com/status-badge/img/gh/dangkhoa2016/Rails-8-API-Authentication/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/dangkhoa2016/Rails-8-API-Authentication/tree/main)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > 🌐 Language / Ngôn ngữ: [English](README.md) | **Tiếng Việt**
 
-Dự án này là một dịch vụ xác thực API Rails 8 được xây dựng với Devise và JWT. Nó hỗ trợ đăng ký, xác nhận email, đăng nhập, đăng xuất, truy vấn hồ sơ, và các thao tác quản lý người dùng với kiểm soát truy cập chỉ dành cho admin.
+Dịch vụ xác thực API Rails 8 theo phong cách production với Devise/JWT, xoay vòng và thu hồi refresh token, rate limiting, Solid Queue, PostgreSQL, và CI tập trung vào bảo mật. Ứng dụng có thể triển khai trên các môi trường Rails/PostgreSQL khác nhau; bản demo công khai dưới đây chỉ là một triển khai đã được chấp nhận, không phải yêu cầu về nhà cung cấp.
+
+## Demo công khai trực tiếp
+
+- **Base URL:** `https://dangkhoa2016--rails-8-api-authentication-rails-api.modal.run`
+- **Health:** `GET https://dangkhoa2016--rails-8-api-authentication-rails-api.modal.run/up`
+
+Đây là demo công khai theo phong cách production được host trên Modal. Ứng dụng vẫn độc lập với nhà cung cấp và tương thích với triển khai Rails/PostgreSQL; demo được chấp nhận sử dụng PostgreSQL trên Neon. Modal chạy với `min_containers=0`, vì vậy cold start do scale-to-zero là bình thường. Dự án không đưa ra cam kết về HA, SLA, multi-tenant, hoặc chống DDoS theo lưu lượng lớn. Không có secret, token, hoặc thông tin đăng nhập admin nào được công bố.
 
 ## Tính năng
 
-- Đăng ký người dùng với `username` bắt buộc và xác nhận email.
-- Đăng nhập, đăng xuất và làm mới token (Refresh Token Rotation - RTR) dựa trên JWT với cơ chế thu hồi token thông qua denylist.
+- Access token Devise/JWT, thu hồi bằng denylist, xoay vòng refresh token, phát hiện tái sử dụng, và thu hồi cả token family.
+- Refresh cho browser bằng signed HttpOnly cookie, đồng thời hỗ trợ refresh token thô cho native, mobile, và CLI client.
+- Đăng ký với `username` bắt buộc, xác nhận email, reset mật khẩu, và cập nhật hoặc xóa tài khoản theo cơ chế self-service.
 - Truy vấn hồ sơ kèm metadata của token qua `/user/profile` và các alias tương thích `/user/me`, `/user/whoami`.
-- Cập nhật tài khoản và xóa tài khoản theo cơ chế self-service.
 - Trạng thái hoạt động/không hoạt động của người dùng — tài khoản bị vô hiệu hóa sẽ tự động bị chặn đăng nhập.
 - Các chức năng chỉ dành cho admin: danh sách người dùng, tạo người dùng, quản lý vai trò, xóa người dùng, bật/tắt trạng thái tài khoản (khóa/mở khóa), và xác nhận email từ admin.
-- Giới hạn tần suất truy cập (rate limiting) cho các endpoint đăng nhập, đăng ký, và reset mật khẩu (rack-attack).
-- Dọn dẹp denylist JWT và Refresh Token hết hạn tự động bằng Active Job (Solid Queue) và Rake task.
-- Triển khai với Docker + Kamal, có health check cho container.
-- CI với Brakeman, RuboCop, toàn bộ test suite của Rails, và một job riêng cho regression test của auth.
+- Rack::Attack rate limit, với `/up` được safelist: API thông thường `300/60s/IP`; refresh `20/60s/IP`; sign-in `5/60s/IP` và `10/60s/email`; đăng ký `10/giờ/IP`; reset mật khẩu `5/giờ/IP`.
+- Dọn dẹp denylist JWT và refresh token hết hạn tự động bằng Active Job, Solid Queue, và Rake task.
+- PostgreSQL cùng Solid Cache, Solid Queue, Solid Cable; hướng dẫn triển khai Docker/Kamal portable và các recipe triển khai đã được xác minh.
+- CI tập trung vào bảo mật: Brakeman, RuboCop, toàn bộ Rails test suite, và auth regression coverage riêng.
 
 ## Công nghệ sử dụng
 
@@ -48,7 +55,7 @@ Repository hỗ trợ ba phiên bản Ruby:
 | Runtime | Vai trò |
 |---------|---------|
 | **3.3** | Mặc định cho phát triển local và image container |
-| **3.2.2** | Phiên bản tối thiểu được hỗ trợ |
+| **3.2** | Phiên bản tối thiểu được hỗ trợ |
 | **4.0** | Phiên bản bổ sung được kiểm thử (chỉ CI) |
 
 CI chạy toàn bộ test suite trên `3.2`, `3.3`, và `4.0`; container mặc định dùng
@@ -58,6 +65,8 @@ Repository cố ý **không commit** `Gemfile.lock`. Mỗi phiên bản Ruby t�
 bộ dependency riêng, nên lockfile được sinh bởi bundler local, bởi Docker build,
 hoặc bởi CI — và không bao giờ chia sẻ giữa các runtime. Điều này giữ dự án
 portable trên toàn bộ ma trận hỗ trợ mà không cố định một resolution duy nhất.
+
+`Gemfile` ràng buộc Rails ở `~> 8.1.3` (README hiển thị dòng phát hành rộng hơn là Rails 8.1) và giữ `json` dưới version 3. CI kiểm chứng Ruby `3.2`, `3.3`, và `4.0` với dependency được resolve mới.
 
 ## Bảo mật dependency
 
@@ -280,6 +289,7 @@ Các route dưới đây phản ánh `config/routes.rb` và implementation hiệ
 | DELETE    | `/users/sign_out`      | Đăng xuất và thu hồi Access JWT & Refresh Token    |
 | GET       | `/users/confirmation`  | Xác nhận email qua flow confirmable của Devise     |
 | POST      | `/users/password`      | Gửi email đặt lại mật khẩu                         |
+| GET       | `/users/password/edit` | Hướng dẫn reset tương thích chỉ dành cho API; không form, không thay đổi dữ liệu |
 | PUT/PATCH | `/users/password`      | Đặt lại mật khẩu với token                         |
 | PUT/PATCH | `/users`               | Cập nhật tài khoản đang đăng nhập                  |
 | DELETE    | `/users`               | Xóa tài khoản đang đăng nhập                       |
@@ -294,6 +304,19 @@ Các route dưới đây phản ánh `config/routes.rb` và implementation hiệ
 
 Cả ba route hồ sơ này cùng trỏ vào một action controller và trả về cùng một cấu trúc response.
 
+### Reset mật khẩu (API-native)
+
+Service API-only này không cung cấp form reset mật khẩu trên trình duyệt.
+`POST /users/password` gửi email chứa reset token thô, payload JSON chuẩn và
+lệnh `curl` có thể copy/paste cho `PUT /users/password`. Request thay đổi mật
+khẩu phải đặt `reset_password_token`, `password`, và `password_confirmation`
+bên trong `user`.
+
+`GET /users/password/edit?reset_password_token=<TOKEN>` chỉ là endpoint hướng
+dẫn tương thích khi người dùng đi tới URL reset Devise truyền thống. Endpoint
+trả về hướng dẫn API dạng plain text với `no-store`; không kiểm tra, không tiêu
+thụ và không thay đổi token. `PUT /users/password` vẫn là authority để thay đổi.
+
 ### Route quản lý người dùng & admin
 
 | Method | Path            | Mục đích                                    |
@@ -301,15 +324,16 @@ Cả ba route hồ sơ này cùng trỏ vào một action controller và trả v
 | GET    | `/users`        | Lấy danh sách người dùng (chỉ admin)        |
 | POST   | `/users/create` | Tạo người dùng (admin)                      |
 | GET    | `/users/:id`    | Xem người dùng (admin hoặc chính mình)      |
-| PUT    | `/users/:id`    | Cập nhật người dùng (admin hoặc chính mình) |
+| PUT/PATCH | `/users/:id` | Cập nhật người dùng (admin hoặc chính mình) |
 | DELETE | `/users/:id`    | Xóa người dùng (admin hoặc chính mình)      |
+| PUT | `/users/:id/status` | Đặt trạng thái active/inactive (chỉ admin) |
+| PUT | `/users/:id/confirm_by_admin` | Xác nhận email bắt buộc (chỉ admin) |
 
 ### Route tiện ích
 
 | Method | Path    | Mục đích                                 |
 | ------ | ------- | ---------------------------------------- |
 | GET    | `/`     | Endpoint chào mừng ở root                |
-| GET    | `/home` | Alias của endpoint chào mừng             |
 | GET    | `/up`   | Health check cho uptime monitor/balancer |
 
 ## Ghi chú về format request
@@ -340,7 +364,7 @@ Ví dụ request đăng nhập:
 }
 ```
 
-Request self-service cập nhật tài khoản trên `PUT /users` hoặc `PATCH /users` bắt buộc phải có `current_password`. Các request admin-managed trên `PUT /users/:id` đi qua `UsersController` nên không yêu cầu `current_password`.
+Request self-service cập nhật tài khoản trên `PUT /users` hoặc `PATCH /users` bắt buộc phải có `current_password`. Các request admin-managed trên `PUT /users/:id` hoặc `PATCH /users/:id` đi qua `UsersController` nên không yêu cầu `current_password`.
 
 Endpoint profile cũng có 2 kiểu lỗi xác thực khác nhau:
 
@@ -405,7 +429,7 @@ curl -X DELETE http://localhost:4000/users/sign_out \
 
 ## Tài liệu tham khảo thủ công
 
-Các file dưới đây phản ánh chính xác hơn việc triển khai thực tế so với các ví dụ trong README gốc, nhưng chúng có kèm các khối output mẫu và nên được xem như ghi chú tham khảo thay vì script shell để chạy nguyên văn:
+Đây là các ví dụ request và tài liệu tham khảo bổ sung. Chúng có kèm các khối output mẫu và nên được xem như ghi chú thay vì script shell để chạy nguyên văn:
 
 - [manual/registration.sh](./manual/registration.sh)
 - [manual/session.sh](./manual/session.sh)
@@ -420,6 +444,12 @@ Thư mục `docs/` chứa các ghi chú chi tiết hơn về implementation và 
 - [docs/JWT_LIFECYCLE.vi.md](./docs/JWT_LIFECYCLE.vi.md) - Vòng đời JWT, metadata ở endpoint profile, thu hồi, và dọn dẹp denylist
 - [docs/RATE_LIMITING.vi.md](./docs/RATE_LIMITING.vi.md) - Các ngưỡng Rack::Attack hiện tại, response khi throttle, và lưu ý sau reverse proxy
 - [docs/DEPLOYMENT.vi.md](./docs/DEPLOYMENT.vi.md) - Triển khai với Kamal, Docker, biến môi trường, health check, và persistence của PostgreSQL
+- [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) - Hướng dẫn triển khai tiếng Anh
+- [deploy/modal/README.vi.md](./deploy/modal/README.vi.md) và [hướng dẫn tiếng Anh](./deploy/modal/README.md) - recipe Modal không khóa nhà cung cấp (`https://<your-modal-url>`)
+- [deploy/beam/README.vi.md](./deploy/beam/README.vi.md) và [deploy/huggingface/README.vi.md](./deploy/huggingface/README.vi.md) - các recipe triển khai đã được xác minh khác
+- [docs/RELEASE_PROCESS.vi.md](./docs/RELEASE_PROCESS.vi.md) và [hướng dẫn tiếng Anh](./docs/RELEASE_PROCESS.md) - quy trình phát hành
+- [docs/releases/v1.0.0-acceptance.md](./docs/releases/v1.0.0-acceptance.md) - hồ sơ nghiệm thu v1.0.0
+- [CHANGELOG.md](./CHANGELOG.md) - lịch sử phát hành
 
 ## Kế hoạch cải tiến
 
@@ -453,4 +483,3 @@ Các file này được tạo dựa trên một sticker từ Flaticon. Xem [publ
 Dự án này được cấp phép theo MIT License.
 
 Xem file [LICENSE](LICENSE) để biết thêm chi tiết.
-
