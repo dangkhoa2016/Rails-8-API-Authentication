@@ -30,6 +30,18 @@ runtime_secret = modal.Secret.from_name(
         "QUEUE_DATABASE_URL",
         "CABLE_DATABASE_URL",
         "CORS_ALLOWED_ORIGINS",
+        "SMTP_ADDRESS",
+        "SMTP_PORT",
+        "SMTP_USERNAME",
+        "SMTP_PASSWORD",
+        "SMTP_DOMAIN",
+        "SMTP_AUTHENTICATION",
+        "SMTP_SSL",
+        "SMTP_ENABLE_STARTTLS_AUTO",
+        "DEVISE_MAILER_SENDER",
+        "APP_HOST",
+        "APP_PROTOCOL",
+        "PUBLIC_DEMO_EMAIL_GUARD",
     ],
 )
 
