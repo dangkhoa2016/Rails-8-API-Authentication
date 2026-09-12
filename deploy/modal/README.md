@@ -54,7 +54,19 @@ Create the named secret `rails-api-production` from an out-of-repository JSON fi
 - `DATABASE_URL`;
 - `CACHE_DATABASE_URL`;
 - `QUEUE_DATABASE_URL`;
-- `CABLE_DATABASE_URL`.
+- `CABLE_DATABASE_URL`;
+- `SMTP_ADDRESS=smtp.resend.com`;
+- `SMTP_PORT=465`;
+- `SMTP_USERNAME=resend`;
+- `SMTP_PASSWORD=<Resend API key>`;
+- `SMTP_DOMAIN=<verified sender domain>`;
+- `SMTP_AUTHENTICATION=plain`;
+- `SMTP_SSL=true`;
+- `SMTP_ENABLE_STARTTLS_AUTO=false`;
+- `DEVISE_MAILER_SENDER=Rails 8 API Authentication <contact@<verified sender domain>>`;
+- `APP_HOST=<public Modal host without scheme>`;
+- `APP_PROTOCOL=https`;
+- `PUBLIC_DEMO_EMAIL_GUARD=true`.
 
 ```bash
 chmod 600 "$HOME/.config/rails-api-production.json"
@@ -93,6 +105,17 @@ curl -i https://<your-modal-url>/up
 ```
 
 Full smoke additionally checks Rails sign-in, standard bearer-token transport, profile access, X-Forwarded-For spoof resistance for the sign-in IP throttle, and refresh-token throttling.
+
+For transactional-email delivery acceptance, use a fresh recipient on an allowed provider and keep the Resend API key only in your local shell:
+
+```bash
+export EMAIL_E2E_RECIPIENT='your-fresh-address@gmail.com'
+export RESEND_API_KEY='re_...'
+./deploy/modal/email_delivery_e2e.sh https://<your-modal-url>
+unset RESEND_API_KEY
+```
+
+The script verifies that an unsupported domain is rejected before delivery, that an allowed-domain registration is accepted, and that Resend reports the resulting confirmation message as `delivered`, `opened`, or `clicked`. It deliberately does not extract confirmation or reset tokens from message content; follow those links manually from the recipient inbox for the final human acceptance step.
 
 ## Cost and abuse posture
 

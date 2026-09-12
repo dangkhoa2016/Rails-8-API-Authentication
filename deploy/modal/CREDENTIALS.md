@@ -70,7 +70,14 @@ The named Modal secret `rails-api-production` contains only:
 - `DATABASE_URL`;
 - `CACHE_DATABASE_URL`;
 - `QUEUE_DATABASE_URL`;
-- `CABLE_DATABASE_URL`.
+- `CABLE_DATABASE_URL`;
+- `SMTP_ADDRESS`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_DOMAIN`;
+- `SMTP_AUTHENTICATION`, `SMTP_SSL`, `SMTP_ENABLE_STARTTLS_AUTO`;
+- `DEVISE_MAILER_SENDER`;
+- `APP_HOST`, `APP_PROTOCOL`;
+- `PUBLIC_DEMO_EMAIL_GUARD`.
+
+For the official Resend-backed public demo, use `smtp.resend.com:465`, username `resend`, the Resend API key as `SMTP_PASSWORD`, `SMTP_SSL=true`, and `SMTP_ENABLE_STARTTLS_AUTO=false`. Keep the API key only in Modal/local secret stores and never in Git or logs.
 
 Do not commit the JSON or shell material used to create that Modal secret.
 
