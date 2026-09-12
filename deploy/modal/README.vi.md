@@ -54,7 +54,19 @@ Tạo named secret `rails-api-production` từ JSON file nằm ngoài repository
 - `DATABASE_URL`;
 - `CACHE_DATABASE_URL`;
 - `QUEUE_DATABASE_URL`;
-- `CABLE_DATABASE_URL`.
+- `CABLE_DATABASE_URL`;
+- `SMTP_ADDRESS=smtp.resend.com`;
+- `SMTP_PORT=465`;
+- `SMTP_USERNAME=resend`;
+- `SMTP_PASSWORD=<Resend API key>`;
+- `SMTP_DOMAIN=<verified sender domain>`;
+- `SMTP_AUTHENTICATION=plain`;
+- `SMTP_SSL=true`;
+- `SMTP_ENABLE_STARTTLS_AUTO=false`;
+- `DEVISE_MAILER_SENDER=Rails 8 API Authentication <contact@<verified sender domain>>`;
+- `APP_HOST=<public Modal host không có scheme>`;
+- `APP_PROTOCOL=https`;
+- `PUBLIC_DEMO_EMAIL_GUARD=true`.
 
 ```bash
 chmod 600 "$HOME/.config/rails-api-production.json"
@@ -92,6 +104,17 @@ curl -i https://<your-modal-url>/up
 ```
 
 Full smoke còn kiểm tra sign-in, bearer token chuẩn, profile access, khả năng chống bypass sign-in IP throttle bằng caller-controlled X-Forwarded-For và refresh-token throttling.
+
+Để acceptance transactional email, dùng một địa chỉ mới thuộc provider được allowlist và chỉ giữ Resend API key trong local shell:
+
+```bash
+export EMAIL_E2E_RECIPIENT='your-fresh-address@gmail.com'
+export RESEND_API_KEY='re_...'
+./deploy/modal/email_delivery_e2e.sh https://<your-modal-url>
+unset RESEND_API_KEY
+```
+
+Script xác minh domain không hỗ trợ bị chặn trước khi gửi, đăng ký với domain hợp lệ được chấp nhận, và Resend báo confirmation message ở trạng thái `delivered`, `opened` hoặc `clicked`. Confirmation vẫn giữ hành vi link hiện có và có thể hoàn tất từ inbox. Email reset mật khẩu thì khác: service API-native này gửi reset token cùng hướng dẫn JSON/curl cho `PUT /users/password`, không gửi browser reset link; hãy dùng API flow đó một cách riêng tư cho password-reset acceptance cuối cùng.
 
 ## Cost và abuse posture
 

@@ -70,7 +70,14 @@ Named secret `rails-api-production` chỉ chứa:
 - `DATABASE_URL`;
 - `CACHE_DATABASE_URL`;
 - `QUEUE_DATABASE_URL`;
-- `CABLE_DATABASE_URL`.
+- `CABLE_DATABASE_URL`;
+- `SMTP_ADDRESS`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_DOMAIN`;
+- `SMTP_AUTHENTICATION`, `SMTP_SSL`, `SMTP_ENABLE_STARTTLS_AUTO`;
+- `DEVISE_MAILER_SENDER`;
+- `APP_HOST`, `APP_PROTOCOL`;
+- `PUBLIC_DEMO_EMAIL_GUARD`.
+
+Với public demo chính thức dùng Resend, cấu hình `smtp.resend.com:465`, username `resend`, dùng Resend API key làm `SMTP_PASSWORD`, đặt `SMTP_SSL=true` và `SMTP_ENABLE_STARTTLS_AUTO=false`. API key chỉ được nằm trong Modal/local secret store, tuyệt đối không vào Git hoặc log.
 
 Không commit JSON/shell material dùng để tạo Modal secret.
 
